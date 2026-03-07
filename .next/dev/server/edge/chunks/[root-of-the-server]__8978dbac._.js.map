@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 16, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/src/middleware.ts"],"sourcesContent":["import { withAuth } from \"next-auth/middleware\"\n\nexport default withAuth({\n  callbacks: {\n    authorized: ({ req, token }) => {\n      if (req.nextUrl.pathname.startsWith(\"/admindnarxx\")) {\n        return token?.role === \"ADMIN\"\n      }\n      return !!token\n    },\n  },\n})\n\nexport const config = { matcher: [\"/dashboard/:path*\", \"/admindnarxx/:path*\"] }\n"],"names":[],"mappings":";;;;;;AAAA;;uCAEe,IAAA,8JAAQ,EAAC;IACtB,WAAW;QACT,YAAY,CAAC,EAAE,GAAG,EAAE,KAAK,EAAE;YACzB,IAAI,IAAI,OAAO,CAAC,QAAQ,CAAC,UAAU,CAAC,iBAAiB;gBACnD,OAAO,OAAO,SAAS;YACzB;YACA,OAAO,CAAC,CAAC;QACX;IACF;AACF;AAEO,MAAM,SAAS;IAAE,SAAS;QAAC;QAAqB;KAAsB;AAAC"}}]
+}

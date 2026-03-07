@@ -1,0 +1,23 @@
+/* [project]/src/app/globals.css [app-client] (css) */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif; --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background: #fff;
+  }
+
+  ::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/*# sourceMappingURL=src_app_globals_91e4631d.css.map*/

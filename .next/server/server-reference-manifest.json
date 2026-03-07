@@ -1,0 +1,96 @@
+{
+  "node": {
+    "007f52c26340e770b2f2eb0c22adcbc37355806354": {
+      "workers": {
+        "app/admindnarxx/page": {
+          "moduleId": 63055,
+          "async": true,
+          "exportedName": "getDoctors",
+          "filename": "src/app/admindnarxx/actions.ts"
+        }
+      },
+      "layer": {
+        "app/admindnarxx/page": "rsc"
+      },
+      "filename": "src/app/admindnarxx/actions.ts",
+      "exportedName": "getDoctors"
+    },
+    "6060e09c0655d1108533cfe9ae0763203539674583": {
+      "workers": {
+        "app/admindnarxx/page": {
+          "moduleId": 63055,
+          "async": true,
+          "exportedName": "toggleDoctorStatus",
+          "filename": "src/app/admindnarxx/actions.ts"
+        }
+      },
+      "layer": {
+        "app/admindnarxx/page": "action-browser"
+      },
+      "filename": "src/app/admindnarxx/actions.ts",
+      "exportedName": "toggleDoctorStatus"
+    },
+    "40ba2ae695e8d9e3a5131642072d2a6a0e581489a8": {
+      "workers": {
+        "app/dashboard/page": {
+          "moduleId": 56241,
+          "async": true,
+          "exportedName": "processAudioAction",
+          "filename": "src/app/dashboard/actions.ts"
+        }
+      },
+      "layer": {
+        "app/dashboard/page": "rsc"
+      },
+      "filename": "src/app/dashboard/actions.ts",
+      "exportedName": "processAudioAction"
+    },
+    "40f55f455559af7f64506bad478fba4ff01739026e": {
+      "workers": {
+        "app/dashboard/page": {
+          "moduleId": 56241,
+          "async": true,
+          "exportedName": "saveDoctorPreferences",
+          "filename": "src/app/dashboard/actions.ts"
+        }
+      },
+      "layer": {
+        "app/dashboard/page": "rsc"
+      },
+      "filename": "src/app/dashboard/actions.ts",
+      "exportedName": "saveDoctorPreferences"
+    },
+    "006e63dbddde85a1745e6adfe8c7bf6a748bebe3cd": {
+      "workers": {
+        "app/dashboard/page": {
+          "moduleId": 56241,
+          "async": true,
+          "exportedName": "getDoctorPreferences",
+          "filename": "src/app/dashboard/actions.ts"
+        }
+      },
+      "layer": {
+        "app/dashboard/page": "rsc"
+      },
+      "filename": "src/app/dashboard/actions.ts",
+      "exportedName": "getDoctorPreferences"
+    },
+    "6061d1e02278ac3e8cbd79df7929e4ab8489333dec": {
+      "workers": {
+        "app/login/page": {
+          "moduleId": 33547,
+          "async": true,
+          "exportedName": "registerUser",
+          "filename": "src/app/actions.ts"
+        }
+      },
+      "layer": {
+        "app/login/page": "action-browser"
+      },
+      "filename": "src/app/actions.ts",
+      "exportedName": "registerUser"
+    }
+  },
+  "edge": {},
+  "encryptionKey": "0O0vKYTGwthmgZAPuVKruT1pCG2SlzbzffNLg7Rw0To="
+}

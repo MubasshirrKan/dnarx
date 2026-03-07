@@ -1,0 +1,50 @@
+{
+  "node": {
+    "40ba2ae695e8d9e3a5131642072d2a6a0e581489a8": {
+      "workers": {
+        "app/dashboard/page": {
+          "moduleId": 56241,
+          "async": true,
+          "exportedName": "processAudioAction",
+          "filename": "src/app/dashboard/actions.ts"
+        }
+      },
+      "layer": {
+        "app/dashboard/page": "rsc"
+      },
+      "exportedName": "processAudioAction",
+      "filename": "src/app/dashboard/actions.ts"
+    },
+    "40f55f455559af7f64506bad478fba4ff01739026e": {
+      "workers": {
+        "app/dashboard/page": {
+          "moduleId": 56241,
+          "async": true,
+          "exportedName": "saveDoctorPreferences",
+          "filename": "src/app/dashboard/actions.ts"
+        }
+      },
+      "layer": {
+        "app/dashboard/page": "rsc"
+      },
+      "exportedName": "saveDoctorPreferences",
+      "filename": "src/app/dashboard/actions.ts"
+    },
+    "006e63dbddde85a1745e6adfe8c7bf6a748bebe3cd": {
+      "workers": {
+        "app/dashboard/page": {
+          "moduleId": 56241,
+          "async": true,
+          "exportedName": "getDoctorPreferences",
+          "filename": "src/app/dashboard/actions.ts"
+        }
+      },
+      "layer": {
+        "app/dashboard/page": "rsc"
+      },
+      "exportedName": "getDoctorPreferences",
+      "filename": "src/app/dashboard/actions.ts"
+    }
+  },
+  "edge": {}
+}

@@ -1,0 +1,55 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  DOCTOR
+}
+
+model User {
+  id          String   @id @default(cuid())
+  phoneNumber String   @unique
+  password    String
+  role        Role     @default(DOCTOR)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  profile     DoctorProfile?
+  prescriptions Prescription[]
+}
+
+model DoctorProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  name            String
+  qualifications  String
+  regNo           String
+  designation     String
+  
+  // JSON fields for structured data
+  clinics            Json? // Array of Clinic objects
+  diagnosticCentres  String[]
+  pharmaCompanies    String[]
+  pharmacies         String[]
+}
+
+model Prescription {
+  id              String   @id @default(cuid())
+  doctorId        String
+  doctor          User     @relation(fields: [doctorId], references: [id])
+  
+  patientName     String?
+  patientPhone    String?
+  
+  patientData     Json // Complete patient intake data
+  prescriptionData Json // Generated prescription data
+  
+  createdAt       DateTime @default(now())
+}

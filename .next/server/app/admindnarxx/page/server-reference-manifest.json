@@ -1,0 +1,35 @@
+{
+  "node": {
+    "007f52c26340e770b2f2eb0c22adcbc37355806354": {
+      "workers": {
+        "app/admindnarxx/page": {
+          "moduleId": 63055,
+          "async": true,
+          "exportedName": "getDoctors",
+          "filename": "src/app/admindnarxx/actions.ts"
+        }
+      },
+      "layer": {
+        "app/admindnarxx/page": "rsc"
+      },
+      "exportedName": "getDoctors",
+      "filename": "src/app/admindnarxx/actions.ts"
+    },
+    "6060e09c0655d1108533cfe9ae0763203539674583": {
+      "workers": {
+        "app/admindnarxx/page": {
+          "moduleId": 63055,
+          "async": true,
+          "exportedName": "toggleDoctorStatus",
+          "filename": "src/app/admindnarxx/actions.ts"
+        }
+      },
+      "layer": {
+        "app/admindnarxx/page": "action-browser"
+      },
+      "exportedName": "toggleDoctorStatus",
+      "filename": "src/app/admindnarxx/actions.ts"
+    }
+  },
+  "edge": {}
+}
