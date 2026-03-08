@@ -16,6 +16,7 @@ interface ActiveConsultationProps {
 
 export function ActiveConsultation({ onPrescriptionGenerated, preferences, patientData }: ActiveConsultationProps) {
   const { isRecording, recordingTime, audioBlob, error, startRecording, stopRecording } = useAudioRecorder();
+  const [chiefComplaints, setChiefComplaints] = useState('');
   const [isFinishing, setIsFinishing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
 
