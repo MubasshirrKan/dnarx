@@ -123,7 +123,7 @@ export async function processAudioAction(formData: FormData) {
       - If the audio contradicts the initial notes, prioritize the audio but note the discrepancy if significant.
       
       MEDICINE SELECTION RULES (CRITICAL):
-      1. **VERIFY WITH GOOGLE SEARCH (medex.com.bd):** You MUST use the `googleSearch` tool to verify every medicine. Specifically search for the medicine brand name on `https://medex.com.bd/` to ensure it is a valid, currently available product in Bangladesh.
+      1. **VERIFY WITH GOOGLE SEARCH (medex.com.bd):** You MUST use the \`googleSearch\` tool to verify every medicine. Specifically search for the medicine brand name on \`https://medex.com.bd/\` to ensure it is a valid, currently available product in Bangladesh.
       2. **Preferred Companies First:** You MUST prioritize medicines from the "Preferred Pharmaceutical Companies" list: [${selectedPreferences?.pharmaCompanies?.join(', ') || 'None specified'}].
       3. **Exact Brand Search:** For every medicine identified:
          - Search query example: "site:medex.com.bd [Medicine Name] [Company Name]"
