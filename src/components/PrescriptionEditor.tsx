@@ -180,7 +180,7 @@ export function PrescriptionEditor({ initialData, onBack, preferences }: Prescri
       </div>
 
       {/* Prescription Paper Layout */}
-      <div className="bg-white shadow-lg rounded-xl overflow-hidden print:shadow-none print:rounded-none min-h-[1123px] print:min-h-0 w-full relative flex flex-col print:block" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+      <div className="bg-white shadow-lg rounded-xl print:shadow-none print:rounded-none min-h-[1123px] print:min-h-0 w-full relative flex flex-col print:block" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
         
         {/* Header Section (Repeats on each page ideally, but basic block flow works) */}
         <div className="bg-emerald-50 p-8 border-b border-emerald-100 print:bg-emerald-50 print:border-b-2 print:border-slate-800 relative group">

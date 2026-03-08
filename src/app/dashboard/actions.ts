@@ -250,10 +250,11 @@ export async function searchMedicineAction(query: string, preferences: any, pati
     Preferred Pharma: [${preferences?.pharmaCompanies?.join(', ')}]
 
     Task:
-    1. Find 3-5 brand names from medex.com.bd that match "${query}".
-    2. Suggest only brands available in Bangladesh.
-    3. Ensure suggestions are appropriate for a ${patientContext.patientAge} year old.
-    4. Format strictly as JSON.
+    1. Search \`medex.com.bd\` for brand names starting with or matching "${query}".
+    2. Prioritize brands from the "Preferred Pharma Companies". If the preferred company doesn't make it, suggest other reputable brands.
+    3. **STRICT RULE:** NEVER suggest vague names like "Painkiller", "Antibiotic", etc. ALWAYS suggest specific Brand Names (e.g., "Napa", "Seclo").
+    4. Ensure suggestions are appropriate for a ${patientContext.patientAge} year old.
+    5. Format strictly as JSON.
 
     [
       {
@@ -267,25 +268,26 @@ export async function searchMedicineAction(query: string, preferences: any, pati
   `;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-    const result = await model.generateContent({
+    const response = await genAI.models.generateContent({
+      model: "gemini-1.5-pro",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
+      config: {
         responseMimeType: "application/json",
       }
     });
 
-    const response = result.response;
-    const text = response.text();
+    const text = response.text;
+    if (!text) return [];
     return JSON.parse(text);
   } catch (error) {
     console.error('Autocomplete Error:', error);
-    // Fallback to simpler search if 1.5-pro fails
     try {
-      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const result = await fallbackModel.generateContent(prompt);
-      const text = result.response.text();
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      const response = await genAI.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: [{ role: "user", parts: [{ text: prompt }] }]
+      });
+      const text = response.text;
+      const jsonMatch = text?.match(/\[[\s\S]*\]/);
       return JSON.parse(jsonMatch ? jsonMatch[0] : "[]");
     } catch (e) {
       return [];
