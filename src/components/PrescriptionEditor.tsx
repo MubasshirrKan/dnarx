@@ -136,10 +136,10 @@ export function PrescriptionEditor({ initialData, onBack, preferences }: Prescri
       </div>
 
       {/* Prescription Paper Layout */}
-      <div className="bg-white shadow-lg rounded-xl overflow-hidden print:shadow-none print:rounded-none min-h-[1123px] w-full relative flex flex-col">
+      <div className="bg-white shadow-lg rounded-xl overflow-hidden print:shadow-none print:rounded-none min-h-[1123px] print:min-h-0 w-full relative flex flex-col print:block" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
         
-        {/* Header Section */}
-        <div className="bg-emerald-50 p-8 border-b border-emerald-100 print:bg-white print:border-b-2 print:border-black relative group">
+        {/* Header Section (Repeats on each page ideally, but basic block flow works) */}
+        <div className="bg-emerald-50 p-8 border-b border-emerald-100 print:bg-emerald-50 print:border-b-2 print:border-slate-800 relative group">
           
           {/* Clinic Selector (Hidden in Print) */}
           {preferences.profile.clinics.length > 1 && (
@@ -254,10 +254,10 @@ export function PrescriptionEditor({ initialData, onBack, preferences }: Prescri
         </div>
 
         {/* Main Content Body */}
-        <div className="flex flex-1 flex-col md:flex-row print:flex-row">
+        <div className="flex flex-1 flex-col md:flex-row print:flex-row print:block">
           
           {/* Left Sidebar: Symptoms & Diagnosis */}
-          <div className="w-full md:w-1/3 print:w-1/3 p-6 border-r border-slate-200 print:border-r print:border-black bg-slate-50/50 print:bg-white flex flex-col">
+          <div className="w-full md:w-1/3 print:w-1/3 print:float-left p-6 border-r border-slate-200 print:border-r print:border-slate-300 bg-slate-50/50 print:bg-slate-50 flex flex-col print:h-full">
             
             {/* Symptoms */}
             <div className="mb-8">

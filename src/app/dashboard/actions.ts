@@ -241,8 +241,30 @@ export async function savePrescription(data: any) {
   const session = await getSession();
   
   // Extract patient phone if available, or leave null
-  // In a real app, you'd want to capture this explicitly in the intake form
   const patientPhone = null; 
+
+  // Check for duplicate within the last 2 minutes
+  const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+  const existingPrescription = await prisma.prescription.findFirst({
+    where: {
+      doctorId: session.user.id,
+      patientName: data.patientName,
+      createdAt: { gte: twoMinutesAgo },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  // If a recent prescription exists, compare the content
+  if (existingPrescription) {
+    const existingDataStr = JSON.stringify(existingPrescription.prescriptionData);
+    const newDataStr = JSON.stringify(data);
+    
+    // Deep comparison (simple stringify works for consistent object structures)
+    if (existingDataStr === newDataStr) {
+      console.log('Duplicate prescription detected, skipping save.');
+      return { success: true, duplicate: true };
+    }
+  }
 
   await prisma.prescription.create({
     data: {
