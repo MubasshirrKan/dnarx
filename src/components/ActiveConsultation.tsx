@@ -16,7 +16,7 @@ interface ActiveConsultationProps {
 
 export function ActiveConsultation({ onPrescriptionGenerated, preferences, patientData }: ActiveConsultationProps) {
   const { isRecording, recordingTime, audioBlob, error, startRecording, stopRecording } = useAudioRecorder();
-  const [chiefComplaints, setChiefComplaints] = useState('');
+  const [isFinishing, setIsFinishing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
 
   // Selection states
@@ -41,44 +41,55 @@ export function ActiveConsultation({ onPrescriptionGenerated, preferences, patie
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleProcess = async () => {
-    if (!audioBlob) return;
-    
-    // Stop recording if still active
+  // Trigger processing when audioBlob is ready after finishing
+  useEffect(() => {
+    const processAudio = async () => {
+      if (isFinishing && audioBlob) {
+        try {
+          // Step 1: Transcribe
+          setProcessingStatus("Uploading and Transcribing Audio...");
+          
+          const formData = new FormData();
+          formData.append('audio', audioBlob);
+          formData.append('patientData', JSON.stringify(patientData));
+          formData.append('chiefComplaints', chiefComplaints);
+
+          const initialData = await transcribeAudioAction(formData);
+
+          // Step 2: Verify
+          setProcessingStatus("Verifying medicines with Medex...");
+          
+          const selectedPreferences = {
+            diagnosticCentres: selectedDiagnosticCentres,
+            pharmaCompanies: selectedPharmaCompanies,
+            pharmacies: selectedPharmacies
+          };
+
+          const finalData = await verifyPrescriptionAction(initialData, selectedPreferences, patientData);
+
+          setProcessingStatus("Finalizing Prescription...");
+          onPrescriptionGenerated(finalData as PrescriptionData);
+
+        } catch (e: any) {
+          console.error(e);
+          setProcessingStatus(null);
+          alert(`Failed to process: ${e.message || 'Unknown error'}`);
+        } finally {
+          setIsFinishing(false);
+        }
+      }
+    };
+
+    processAudio();
+  }, [isFinishing, audioBlob, chiefComplaints, patientData, selectedDiagnosticCentres, selectedPharmaCompanies, selectedPharmacies, onPrescriptionGenerated]);
+
+  const handleStopAndGenerate = () => {
     if (isRecording) {
       stopRecording();
     }
-
-    try {
-      // Step 1: Transcribe
-      setProcessingStatus("Uploading and Transcribing Audio...");
-      
-      const formData = new FormData();
-      formData.append('audio', audioBlob);
-      formData.append('patientData', JSON.stringify(patientData));
-      formData.append('chiefComplaints', chiefComplaints);
-
-      const initialData = await transcribeAudioAction(formData);
-
-      // Step 2: Verify
-      setProcessingStatus("Verifying medicines with Medex...");
-      
-      const selectedPreferences = {
-        diagnosticCentres: selectedDiagnosticCentres,
-        pharmaCompanies: selectedPharmaCompanies,
-        pharmacies: selectedPharmacies
-      };
-
-      const finalData = await verifyPrescriptionAction(initialData, selectedPreferences, patientData);
-
-      setProcessingStatus("Finalizing Prescription...");
-      onPrescriptionGenerated(finalData as PrescriptionData);
-
-    } catch (e: any) {
-      console.error(e);
-      setProcessingStatus(null);
-      alert(`Failed to process: ${e.message || 'Unknown error'}`);
-    }
+    // Set finishing flag to trigger the useEffect once audioBlob is updated
+    setIsFinishing(true);
+    setProcessingStatus("Finalizing recording...");
   };
 
   const formatTime = (seconds: number) => {
@@ -291,7 +302,7 @@ export function ActiveConsultation({ onPrescriptionGenerated, preferences, patie
             </h3>
             
             <button
-              onClick={handleProcess}
+              onClick={handleStopAndGenerate}
               disabled={!!processingStatus || (!isRecording && !audioBlob)}
               className={cn(
                 "w-full py-4 rounded-xl font-semibold text-white shadow-lg transition-all flex items-center justify-center gap-2",
