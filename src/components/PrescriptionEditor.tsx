@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Printer, ArrowLeft, Save, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Printer, ArrowLeft, Save, RefreshCw, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Medicine, PrescriptionData, DoctorPreferences } from '@/types';
 import { cn } from '@/lib/utils';
