@@ -21,6 +21,7 @@ export function PrescriptionEditor({ initialData, onBack, preferences }: Prescri
   const [suggestions, setSuggestions] = useState<Medicine[]>([]);
   const [activeInputId, setActiveInputId] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const selectedClinic = preferences.profile.clinics.find(c => c.id === (preferences.profile.clinics[0]?.id || '')) || preferences.profile.clinics[0];
 
@@ -30,26 +31,37 @@ export function PrescriptionEditor({ initialData, onBack, preferences }: Prescri
     setHasSaved(false); // Reset save state for new prescription
   }, [initialData]);
 
-  const handleMedicineSearch = async (id: string, query: string) => {
+  const handleMedicineSearch = (id: string, query: string) => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
     if (query.length < 2) {
       setSuggestions([]);
+      setIsSearching(false);
       return;
     }
-    
+
     setIsSearching(true);
     setActiveInputId(id);
-    try {
-      const results = await searchMedicineAction(query, preferences, {
-        patientName: data.patientName,
-        patientAge: data.patientAge,
-        diagnosis: data.diagnosis
-      });
-      setSuggestions(results as Medicine[]);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsSearching(false);
-    }
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const results = await searchMedicineAction(query, preferences, {
+          patientName: data.patientName,
+          patientAge: data.patientAge,
+          diagnosis: data.diagnosis
+        });
+        
+        // Only update if we are still on the same input
+        setSuggestions(results as Medicine[]);
+      } catch (e) {
+        console.error(e);
+        setSuggestions([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 600); // 600ms debounce
   };
 
   const selectSuggestion = (id: string, suggestion: Medicine) => {
@@ -393,28 +405,42 @@ export function PrescriptionEditor({ initialData, onBack, preferences }: Prescri
                           updateMedicine(med.id, 'name', e.target.value);
                           handleMedicineSearch(med.id, e.target.value);
                         }}
-                        onFocus={() => med.name.length >= 2 && handleMedicineSearch(med.id, med.name)}
+                        onFocus={() => {
+                          setActiveInputId(med.id);
+                          if (med.name.length >= 2) handleMedicineSearch(med.id, med.name);
+                        }}
+                        onBlur={() => {
+                          // Short delay to allow clicking a suggestion before the dropdown closes
+                          setTimeout(() => {
+                            if (activeInputId === med.id) setActiveInputId(null);
+                          }, 200);
+                        }}
                         className="w-full text-lg font-bold text-slate-900 placeholder:text-slate-300 outline-none bg-transparent print:text-black"
                         placeholder="Medicine Name (e.g. Napa Extra)"
                       />
                       
                       {/* Autocomplete Suggestions */}
                       {activeInputId === med.id && (suggestions.length > 0 || isSearching) && (
-                        <div className="absolute top-full left-0 z-[60] bg-white border border-slate-200 shadow-xl rounded-lg p-2 w-80 mt-1 print:hidden">
+                        <div className="absolute top-full left-0 z-[60] bg-white border border-slate-200 shadow-2xl rounded-xl p-3 w-80 mt-2 print:hidden overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                            {isSearching && (
-                             <div className="flex items-center gap-2 p-2 text-xs text-slate-500">
-                               <Loader2 className="w-3 h-3 animate-spin" /> Searching Medex...
+                             <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-emerald-600">
+                               <Loader2 className="w-4 h-4 animate-spin" /> 
+                               <span>Analyzing Context & searching Medex...</span>
                              </div>
                            )}
-                           <ul className="max-h-60 overflow-y-auto">
+                           <ul className="max-h-64 overflow-y-auto space-y-1">
                               {suggestions.map((s, i) => (
                                 <li key={i}>
                                   <button 
-                                    onClick={() => selectSuggestion(med.id, s)}
-                                    className="w-full text-left p-2 hover:bg-emerald-50 rounded transition-colors"
+                                    onMouseDown={(e) => {
+                                      // Use onMouseDown to trigger BEFORE onBlur
+                                      e.preventDefault(); 
+                                      selectSuggestion(med.id, s);
+                                    }}
+                                    className="w-full text-left p-3 hover:bg-emerald-50 rounded-lg transition-all border border-transparent hover:border-emerald-100 group"
                                   >
-                                    <div className="font-bold text-sm text-slate-900">{s.name}</div>
-                                    <div className="text-[10px] text-slate-500">{s.dosage} • {s.frequency} • {s.instruction}</div>
+                                    <div className="font-bold text-slate-900 group-hover:text-emerald-700">{s.name}</div>
+                                    <div className="text-[11px] text-slate-500 mt-0.5 font-medium">{s.dosage} • {s.frequency} • {s.instruction}</div>
                                   </button>
                                 </li>
                               ))}

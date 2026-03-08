@@ -243,47 +243,53 @@ export async function searchMedicineAction(query: string, preferences: any, pati
   if (query.length < 2) return [];
 
   const prompt = `
-    You are an intelligent medical autocomplete assistant for doctors in Bangladesh.
-    The doctor is typing: "${query}"
+    You are an intelligent medical assistant in Bangladesh.
+    Doctor is typing: "${query}"
     
-    Context:
-    - Patient: ${patientContext.patientName}, Age ${patientContext.patientAge}, Diagnosis: ${patientContext.diagnosis?.join(', ')}
-    - Preferred Pharma Companies: [${preferences?.pharmaCompanies?.join(', ')}]
+    Patient: ${patientContext.patientAge} years old, Diagnosis: ${patientContext.diagnosis?.join(', ')}
+    Preferred Pharma: [${preferences?.pharmaCompanies?.join(', ')}]
 
     Task:
-    1. Search \`medex.com.bd\` for brand names starting with or matching "${query}".
-    2. Prioritize brands from the "Preferred Pharma Companies".
-    3. Based on the patient's age and diagnosis, suggest the most appropriate 3-5 medicines.
-    4. For each, provide the standard dosage, frequency, and instruction used in Bangladesh.
+    1. Find 3-5 brand names from medex.com.bd that match "${query}".
+    2. Suggest only brands available in Bangladesh.
+    3. Ensure suggestions are appropriate for a ${patientContext.patientAge} year old.
+    4. Format strictly as JSON.
 
-    Return a JSON array of objects:
     [
       {
-        "name": "Exact Brand Name",
-        "dosage": "e.g. 500mg",
-        "frequency": "e.g. 1+0+1",
-        "duration": "e.g. 5 days",
-        "instruction": "e.g. After meal"
+        "name": "Brand Name",
+        "dosage": "500mg",
+        "frequency": "1+0+1",
+        "duration": "5 days",
+        "instruction": "After meal"
       }
     ]
-    RETURN ONLY JSON.
   `;
 
   try {
-    const response = await genAI.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        tools: [{ googleSearch: {} }]
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
       }
     });
 
-    const text = response.text;
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    return JSON.parse(jsonMatch ? jsonMatch[0] : "[]");
+    const response = result.response;
+    const text = response.text();
+    return JSON.parse(text);
   } catch (error) {
     console.error('Autocomplete Error:', error);
-    return [];
+    // Fallback to simpler search if 1.5-pro fails
+    try {
+      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const result = await fallbackModel.generateContent(prompt);
+      const text = result.response.text();
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      return JSON.parse(jsonMatch ? jsonMatch[0] : "[]");
+    } catch (e) {
+      return [];
+    }
   }
 }
 
