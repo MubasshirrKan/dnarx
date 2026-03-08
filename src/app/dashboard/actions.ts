@@ -180,7 +180,6 @@ export async function processAudioAction(formData: FormData) {
           ]
       },
       config: {
-        responseMimeType: "application/json",
         tools: [{ googleSearch: {} }]
       }
     });
@@ -205,7 +204,11 @@ export async function processAudioAction(formData: FormData) {
       throw new Error("No response from AI");
     }
     
-    const data = JSON.parse(text);
+    // Sanitize JSON output (remove markdown code blocks if present)
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const jsonString = jsonMatch ? jsonMatch[0] : text;
+
+    const data = JSON.parse(jsonString);
      // Add IDs to medicines for React keys
      const medicinesWithIds = (data.medicines || []).map((med: any) => ({
       ...med,
