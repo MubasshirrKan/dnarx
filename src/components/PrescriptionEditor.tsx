@@ -22,14 +22,25 @@ export function PrescriptionEditor({ initialData, onBack, preferences }: Prescri
   const [activeInputId, setActiveInputId] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  
+  const [selectedClinicId, setSelectedClinicId] = useState<string>(
+    preferences.profile.clinics[0]?.id || ''
+  );
 
-  const selectedClinic = preferences.profile.clinics.find(c => c.id === (preferences.profile.clinics[0]?.id || '')) || preferences.profile.clinics[0];
+  const selectedClinic = preferences.profile.clinics.find(c => c.id === selectedClinicId) || preferences.profile.clinics[0];
 
   // Update local state if initialData changes
   useEffect(() => {
     setData(initialData);
     setHasSaved(false); // Reset save state for new prescription
   }, [initialData]);
+
+  // Update selected clinic if preferences change
+  useEffect(() => {
+    if (preferences.profile.clinics.length > 0 && !preferences.profile.clinics.find(c => c.id === selectedClinicId)) {
+      setSelectedClinicId(preferences.profile.clinics[0].id);
+    }
+  }, [preferences.profile.clinics, selectedClinicId]);
 
   const handleMedicineSearch = (id: string, query: string) => {
     if (searchTimeoutRef.current) {
