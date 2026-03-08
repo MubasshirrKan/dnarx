@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/authOptions';
 import { DoctorPreferences } from '@/types';
 import { GoogleGenAI } from "@google/genai";
 import { revalidatePath } from 'next/cache';
+import { Buffer } from 'node:buffer';
 
 async function getSession() {
   const session = await getServerSession(authOptions);
@@ -153,10 +154,7 @@ export async function processAudioAction(formData: FormData) {
 
   try {
     const response = await genAI.models.generateContent({
-      model: "gemini-2.0-flash", // Use a valid model name, user had 'gemini-3.1-pro-preview' which might be valid but let's stick to standard or provided one. The provided code used 'gemini-3.1-pro-preview' and fallback 'gemini-3-flash-preview'. I will use 'gemini-2.0-flash' as it is standard or 'gemini-1.5-pro'.
-      // Actually, let's use the one from the user's code if possible, but 3.1 is very new. I'll stick to 'gemini-2.0-flash' which is generally available or 'gemini-1.5-flash'.
-      // The user used `@google/genai` v1.29.0.
-      // I will use 'gemini-2.0-flash' for speed and quality.
+      model: "gemini-1.5-flash",
       contents: {
         parts: [
             {
@@ -176,7 +174,10 @@ export async function processAudioAction(formData: FormData) {
     });
 
     const text = response.text;
-    if (!text) throw new Error("No response from AI");
+    if (!text) {
+      console.error('Gemini API Response Empty:', JSON.stringify(response, null, 2));
+      throw new Error("No response from AI");
+    }
     
     const data = JSON.parse(text);
      // Add IDs to medicines for React keys
@@ -190,8 +191,11 @@ export async function processAudioAction(formData: FormData) {
       medicines: medicinesWithIds
     };
 
-  } catch (error) {
-    console.error('Gemini API Error:', error);
-    throw new Error('Failed to process audio');
+  } catch (error: any) {
+    console.error('Gemini API Error Full:', error);
+    if (error.response) {
+       console.error('Gemini API Error Response:', JSON.stringify(error.response, null, 2));
+    }
+    throw new Error(`Failed to process audio: ${error.message || 'Unknown error'}`);
   }
 }
