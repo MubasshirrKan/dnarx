@@ -121,9 +121,17 @@ export async function processAudioAction(formData: FormData) {
       - Use the patient's age, gender, weight, height, blood pressure, and medical history to calculate safe dosages and check for contraindications.
       - Incorporate the chief complaints into the symptoms or diagnosis section if relevant.
       - If the audio contradicts the initial notes, prioritize the audio but note the discrepancy if significant.
-      - **Medicine Suggestions**: Prioritize medicines from the "Preferred Pharmaceutical Companies" listed above. If a generic medicine is identified, try to suggest a brand name from these companies if available in Bangladesh.
-      - **Diagnostic Suggestions**: If any tests are recommended, suggest the "Preferred Diagnostic Centres" in the advice section or as a note.
-      - **Pharmacy Suggestions**: Suggest the "Preferred Pharmacies" in the advice section or as a note.
+      
+      MEDICINE SELECTION RULES (CRITICAL):
+      1. **Preferred Companies First:** You MUST prioritize medicines from the "Preferred Pharmaceutical Companies" list: [${selectedPreferences?.pharmaCompanies?.join(', ') || 'None specified'}].
+      2. **Exact Brand Search:** For every medicine identified (generic or brand mentioned), you MUST first search for an exact brand name equivalent from the preferred companies available in Bangladesh.
+      3. **Suggest ALL Options:** Do NOT limit suggestions to a minimum. If multiple valid treatment options or supportive medicines exist based on the diagnosis and notes, include ALL of them.
+      4. **Brand Name Priority:**
+         - If a specific brand is mentioned in the audio, check if it belongs to a preferred company. If not, suggest an equivalent from a preferred company as an alternative if possible, or keep the mentioned one if critical.
+         - If a generic name is mentioned, ALWAYS convert it to a brand name from the preferred companies.
+      
+      - **Diagnostic Suggestions:** If any tests are recommended, suggest the "Preferred Diagnostic Centres" in the advice section or as a note.
+      - **Pharmacy Suggestions:** Suggest the "Preferred Pharmacies" in the advice section or as a note.
       
       Output a JSON object with the following structure:
       {
