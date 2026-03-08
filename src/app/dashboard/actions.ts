@@ -123,12 +123,15 @@ export async function processAudioAction(formData: FormData) {
       - If the audio contradicts the initial notes, prioritize the audio but note the discrepancy if significant.
       
       MEDICINE SELECTION RULES (CRITICAL):
-      1. **Preferred Companies First:** You MUST prioritize medicines from the "Preferred Pharmaceutical Companies" list: [${selectedPreferences?.pharmaCompanies?.join(', ') || 'None specified'}].
-      2. **Exact Brand Search:** For every medicine identified (generic or brand mentioned), you MUST first search for an exact brand name equivalent from the preferred companies available in Bangladesh.
-      3. **Suggest ALL Options:** Do NOT limit suggestions to a minimum. If multiple valid treatment options or supportive medicines exist based on the diagnosis and notes, include ALL of them.
-      4. **Brand Name Priority:**
-         - If a specific brand is mentioned in the audio, check if it belongs to a preferred company. If not, suggest an equivalent from a preferred company as an alternative if possible, or keep the mentioned one if critical.
-         - If a generic name is mentioned, ALWAYS convert it to a brand name from the preferred companies.
+      1. **VERIFY WITH GOOGLE SEARCH (medex.com.bd):** You MUST use the `googleSearch` tool to verify every medicine. Specifically search for the medicine brand name on `https://medex.com.bd/` to ensure it is a valid, currently available product in Bangladesh.
+      2. **Preferred Companies First:** You MUST prioritize medicines from the "Preferred Pharmaceutical Companies" list: [${selectedPreferences?.pharmaCompanies?.join(', ') || 'None specified'}].
+      3. **Exact Brand Search:** For every medicine identified:
+         - Search query example: "site:medex.com.bd [Medicine Name] [Company Name]"
+         - Ensure the brand name matches the company. If the preferred company doesn't make that exact generic, find the equivalent brand they DO make using Medex data.
+      4. **Suggest ALL Options:** Do NOT limit suggestions to a minimum. If multiple valid treatment options or supportive medicines exist based on the diagnosis and notes, include ALL of them.
+      5. **Brand Name Priority:**
+         - If a specific brand is mentioned in the audio, verify it on Medex. If it belongs to a preferred company, use it.
+         - If it doesn't, or if a generic is used, find the brand from a preferred company on Medex.
       
       - **Diagnostic Suggestions:** If any tests are recommended, suggest the "Preferred Diagnostic Centres" in the advice section or as a note.
       - **Pharmacy Suggestions:** Suggest the "Preferred Pharmacies" in the advice section or as a note.
@@ -145,7 +148,7 @@ export async function processAudioAction(formData: FormData) {
         "diagnosis": ["string", "string"],
         "medicines": [
           {
-            "name": "string (Use popular Bangladeshi brand names like Napa, Seclo, Monas, Sergel, Maxpro, etc. where appropriate, or generic names. Prioritize brands from preferred companies: ${selectedPreferences?.pharmaCompanies?.join(', ')})",
+            "name": "string (Exact Brand Name found on medex.com.bd)",
             "dosage": "string (e.g., 500mg)",
             "frequency": "string (e.g., 1+0+1 or Twice daily)",
             "duration": "string (e.g., 5 days)",
@@ -177,7 +180,8 @@ export async function processAudioAction(formData: FormData) {
           ]
       },
       config: {
-        responseMimeType: "application/json"
+        responseMimeType: "application/json",
+        tools: [{ googleSearch: {} }]
       }
     });
   };
