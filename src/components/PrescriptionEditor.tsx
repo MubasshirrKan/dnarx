@@ -3,6 +3,7 @@ import { Plus, Trash2, Printer, ArrowLeft, Save, RefreshCw } from 'lucide-react'
 import { motion } from 'motion/react';
 import { Medicine, PrescriptionData, DoctorPreferences } from '@/types';
 import { cn } from '@/lib/utils';
+import { savePrescription } from '@/app/dashboard/actions';
 
 interface PrescriptionEditorProps {
   initialData: PrescriptionData;
@@ -32,8 +33,17 @@ export function PrescriptionEditor({ initialData, onBack, preferences }: Prescri
     }
   }, [preferences.profile.clinics, selectedClinicId]);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     setIsPrinting(true);
+    
+    // Save to database before printing
+    try {
+      await savePrescription(data);
+    } catch (error) {
+      console.error("Failed to save prescription:", error);
+      // Optional: alert user, but don't block printing
+    }
+
     setTimeout(() => {
       window.print();
       setIsPrinting(false);

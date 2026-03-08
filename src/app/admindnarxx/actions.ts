@@ -18,6 +18,9 @@ export async function getDoctors() {
     where: { role: 'DOCTOR' },
     include: {
       profile: true,
+      prescriptions: {
+        orderBy: { createdAt: 'desc' },
+      },
     },
     orderBy: { createdAt: 'desc' },
   });

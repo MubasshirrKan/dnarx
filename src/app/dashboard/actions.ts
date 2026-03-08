@@ -165,6 +165,7 @@ export async function verifyPrescriptionAction(initialData: any, preferences: an
     3. If the mentioned medicine is NOT from a preferred company, FIND an equivalent brand from a preferred company using the search.
     4. If no preferred alternative exists, keep the original but verify its dosage forms available in BD.
     5. Suggest ALL possible relevant medicines based on diagnosis if they were implied but not explicitly named, ensuring they are from preferred companies.
+    6. **STRICT RULE:** NEVER use vague names like "Painkiller", "Antibiotic", "Gastric medicine". ALWAYS use the specific Brand Name found on Medex (e.g., "Napa", "Seclo", "Azithrocin"). If a generic is transcribed, you MUST convert it to a verified Brand Name.
 
     Output a FINAL JSON object matching this structure:
     {
@@ -234,4 +235,30 @@ export async function verifyPrescriptionAction(initialData: any, preferences: an
     console.error('Verification Error:', error);
     throw new Error(`Verification failed: ${error.message}`);
   }
+}
+
+export async function savePrescription(data: any) {
+  const session = await getSession();
+  
+  // Extract patient phone if available, or leave null
+  // In a real app, you'd want to capture this explicitly in the intake form
+  const patientPhone = null; 
+
+  await prisma.prescription.create({
+    data: {
+      doctorId: session.user.id,
+      patientName: data.patientName,
+      patientPhone: patientPhone,
+      patientData: {
+        age: data.patientAge,
+        gender: data.patientGender,
+        weight: data.patientWeight,
+        height: data.patientHeight,
+        bp: data.patientBp,
+      },
+      prescriptionData: data,
+    },
+  });
+
+  return { success: true };
 }

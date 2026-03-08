@@ -39,6 +39,7 @@ export async function registerUser(prevState: any, formData: FormData) {
         phoneNumber,
         password: hashedPassword,
         role: 'DOCTOR',
+        isActive: false, // Require admin approval
         profile: {
           create: {
             name: fullName,
