@@ -14,6 +14,7 @@ interface PrescriptionEditorProps {
 export function PrescriptionEditor({ initialData, onBack, preferences }: PrescriptionEditorProps) {
   const [data, setData] = useState<PrescriptionData>(initialData);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [hasSaved, setHasSaved] = useState(false);
   const [showAlternatives, setShowAlternatives] = useState<string | null>(null);
   const [selectedClinicId, setSelectedClinicId] = useState<string>(
     preferences.profile.clinics[0]?.id || ''
@@ -24,6 +25,7 @@ export function PrescriptionEditor({ initialData, onBack, preferences }: Prescri
   // Update local state if initialData changes
   useEffect(() => {
     setData(initialData);
+    setHasSaved(false); // Reset save state for new prescription
   }, [initialData]);
 
   // Update selected clinic if preferences change
@@ -36,12 +38,14 @@ export function PrescriptionEditor({ initialData, onBack, preferences }: Prescri
   const handlePrint = async () => {
     setIsPrinting(true);
     
-    // Save to database before printing
-    try {
-      await savePrescription(data);
-    } catch (error) {
-      console.error("Failed to save prescription:", error);
-      // Optional: alert user, but don't block printing
+    // Save to database before printing ONLY if not already saved
+    if (!hasSaved) {
+      try {
+        await savePrescription(data);
+        setHasSaved(true); // Mark as saved to prevent duplicates
+      } catch (error) {
+        console.error("Failed to save prescription:", error);
+      }
     }
 
     setTimeout(() => {

@@ -5,7 +5,8 @@ import { toggleDoctorStatus } from './actions';
 import { Stethoscope, LogOut, CheckCircle, XCircle, Search, FileText, Calendar, X, Building, MapPin, Phone } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'motion/react';
-import { DoctorProfile } from '@/types';
+import { DoctorProfile, PrescriptionData } from '@/types';
+import { PrescriptionView } from '@/components/PrescriptionView';
 
 interface Doctor {
   id: string;
@@ -20,6 +21,7 @@ export function AdminDashboardClient({ doctors: initialDoctors }: { doctors: any
   const [doctors, setDoctors] = useState(initialDoctors);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const [selectedPrescription, setSelectedPrescription] = useState<{data: PrescriptionData, doctorProfile: DoctorProfile} | null>(null);
 
   const handleToggleStatus = async (id: string, currentStatus: boolean) => {
     setDoctors(doctors.map(d => d.id === id ? { ...d, isActive: !currentStatus } : d));
@@ -243,10 +245,17 @@ export function AdminDashboardClient({ doctors: initialDoctors }: { doctors: any
                     
                     <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                       {selectedDoctor.prescriptions?.map((prescription) => (
-                        <div key={prescription.id} className="p-4 border border-slate-100 rounded-lg hover:border-emerald-200 hover:bg-emerald-50/30 transition-colors">
+                        <div 
+                          key={prescription.id} 
+                          onClick={() => selectedDoctor.profile && setSelectedPrescription({ 
+                            data: prescription.prescriptionData, 
+                            doctorProfile: selectedDoctor.profile 
+                          })}
+                          className="p-4 border border-slate-100 rounded-lg hover:border-emerald-200 hover:bg-emerald-50/30 transition-colors cursor-pointer group"
+                        >
                           <div className="flex justify-between items-start mb-2">
                             <div>
-                              <div className="font-medium text-slate-900">{prescription.patientName}</div>
+                              <div className="font-medium text-slate-900 group-hover:text-emerald-700 transition-colors">{prescription.patientName}</div>
                               <div className="text-xs text-slate-500">
                                 {prescription.patientData?.age} • {prescription.patientData?.gender}
                               </div>
@@ -277,6 +286,15 @@ export function AdminDashboardClient({ doctors: initialDoctors }: { doctors: any
           </div>
         )}
       </AnimatePresence>
+
+      {/* Prescription View Modal */}
+      {selectedPrescription && (
+        <PrescriptionView 
+          data={selectedPrescription.data}
+          doctorProfile={selectedPrescription.doctorProfile}
+          onClose={() => setSelectedPrescription(null)}
+        />
+      )}
     </div>
   );
 }
