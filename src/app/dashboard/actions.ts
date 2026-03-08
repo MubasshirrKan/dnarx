@@ -152,9 +152,9 @@ export async function processAudioAction(formData: FormData) {
       Ensure the output is valid JSON. Do not include markdown code blocks.
   `;
 
-  try {
-    const response = await genAI.models.generateContent({
-      model: "gemini-1.5-flash",
+  const generateContent = async (model: string) => {
+    return await genAI.models.generateContent({
+      model: model,
       contents: {
         parts: [
             {
@@ -172,6 +172,20 @@ export async function processAudioAction(formData: FormData) {
         responseMimeType: "application/json"
       }
     });
+  };
+
+  try {
+    let response;
+    try {
+      // Try with the latest model first
+      response = await generateContent("gemini-2.0-flash");
+    } catch (primaryError: any) {
+      console.warn("Primary model (gemini-2.0-flash) failed, attempting fallback...", primaryError.message);
+      // Wait for 2 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Fallback to stable model
+      response = await generateContent("gemini-1.5-flash");
+    }
 
     const text = response.text;
     if (!text) {
