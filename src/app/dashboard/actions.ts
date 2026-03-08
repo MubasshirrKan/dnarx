@@ -97,7 +97,7 @@ export async function transcribeAudioAction(formData: FormData) {
     Task:
     1. Transcribe the audio conversation between doctor and patient accurately.
     2. Extract ALL symptoms, diagnosis, and a list of ALL medicines mentioned (generic or brand).
-    3. Extract advice and recommended tests.
+    3. Extract advice and recommended tests. For tests, ALWAYS use the standard, formal medical terminology (the "bookish" name, e.g., "Complete Blood Count (CBC)", "Ultrasonography of Whole Abdomen").
     
     Output a JSON object:
     {
@@ -165,7 +165,8 @@ export async function verifyPrescriptionAction(initialData: any, preferences: an
     3. If the mentioned medicine is NOT from a preferred company, FIND an equivalent brand from a preferred company using the search.
     4. If no preferred alternative exists, keep the original but verify its dosage forms available in BD.
     5. Suggest ALL possible relevant medicines based on diagnosis if they were implied but not explicitly named, ensuring they are from preferred companies.
-    6. **STRICT RULE:** NEVER use vague names like "Painkiller", "Antibiotic", "Gastric medicine". ALWAYS use the specific Brand Name found on Medex (e.g., "Napa", "Seclo", "Azithrocin"). If a generic is transcribed, you MUST convert it to a verified Brand Name.
+    6. **STRICT RULE (TESTS):** For any tests or investigations, ALWAYS use the formal, standard medical terminology (the "bookish" name, e.g., "Ultrasonography of Whole Abdomen", "Serum Creatinine").
+    7. **STRICT RULE (MEDICINES):** NEVER use vague names like "Painkiller", "Antibiotic", "Gastric medicine". ALWAYS use the specific Brand Name found on Medex (e.g., "Napa", "Seclo", "Azithrocin"). If a generic is transcribed, you MUST convert it to a verified Brand Name.
 
     Output a FINAL JSON object matching this structure:
     {
@@ -234,6 +235,55 @@ export async function verifyPrescriptionAction(initialData: any, preferences: an
   } catch (error: any) {
     console.error('Verification Error:', error);
     throw new Error(`Verification failed: ${error.message}`);
+  }
+}
+
+export async function searchMedicineAction(query: string, preferences: any, patientContext: any) {
+  if (!genAI) throw new Error("GEMINI_API_KEY is not set.");
+  if (query.length < 2) return [];
+
+  const prompt = `
+    You are an intelligent medical autocomplete assistant for doctors in Bangladesh.
+    The doctor is typing: "${query}"
+    
+    Context:
+    - Patient: ${patientContext.patientName}, Age ${patientContext.patientAge}, Diagnosis: ${patientContext.diagnosis?.join(', ')}
+    - Preferred Pharma Companies: [${preferences?.pharmaCompanies?.join(', ')}]
+
+    Task:
+    1. Search \`medex.com.bd\` for brand names starting with or matching "${query}".
+    2. Prioritize brands from the "Preferred Pharma Companies".
+    3. Based on the patient's age and diagnosis, suggest the most appropriate 3-5 medicines.
+    4. For each, provide the standard dosage, frequency, and instruction used in Bangladesh.
+
+    Return a JSON array of objects:
+    [
+      {
+        "name": "Exact Brand Name",
+        "dosage": "e.g. 500mg",
+        "frequency": "e.g. 1+0+1",
+        "duration": "e.g. 5 days",
+        "instruction": "e.g. After meal"
+      }
+    ]
+    RETURN ONLY JSON.
+  `;
+
+  try {
+    const response = await genAI.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        tools: [{ googleSearch: {} }]
+      }
+    });
+
+    const text = response.text;
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    return JSON.parse(jsonMatch ? jsonMatch[0] : "[]");
+  } catch (error) {
+    console.error('Autocomplete Error:', error);
+    return [];
   }
 }
 
