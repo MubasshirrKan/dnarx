@@ -7,7 +7,7 @@ import { PrescriptionEditor } from './PrescriptionEditor';
 import { Settings } from './Settings';
 import { Stethoscope, UserPlus, LogOut, Settings as SettingsIcon } from 'lucide-react';
 import { DoctorPreferences, PatientData, PrescriptionData } from '@/types';
-import { processAudioAction, saveDoctorPreferences } from '@/app/dashboard/actions';
+import { saveDoctorPreferences } from '@/app/dashboard/actions';
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
@@ -19,13 +19,11 @@ export function MainApp({ initialPreferences }: MainAppProps) {
   const router = useRouter();
   const [showSettings, setShowSettings] = useState(false);
   const [step, setStep] = useState<'intake' | 'consultation' | 'prescription'>('intake');
-  const [isProcessing, setIsProcessing] = useState(false);
   const [patientData, setPatientData] = useState<PatientData | null>(null);
   const [prescriptionData, setPrescriptionData] = useState<PrescriptionData | null>(null);
   
   const [doctorPreferences, setDoctorPreferences] = useState<DoctorPreferences>(initialPreferences);
 
-  // Check if profile is complete on load
   useEffect(() => {
     if (!initialPreferences.profile.name || initialPreferences.profile.clinics.length === 0) {
       setShowSettings(true);
@@ -41,34 +39,9 @@ export function MainApp({ initialPreferences }: MainAppProps) {
     setStep('consultation');
   };
 
-  const handleGeneratePrescription = async (
-    audioBlob: Blob, 
-    chiefComplaints: string,
-    selectedPreferences: {
-      diagnosticCentres: string[];
-      pharmaCompanies: string[];
-      pharmacies: string[];
-    }
-  ) => {
-    if (!patientData) return;
-    
-    setIsProcessing(true);
-    try {
-      const formData = new FormData();
-      formData.append('audio', audioBlob);
-      formData.append('patientData', JSON.stringify(patientData));
-      formData.append('chiefComplaints', chiefComplaints);
-      formData.append('preferences', JSON.stringify(selectedPreferences));
-
-      const data = await processAudioAction(formData);
-      setPrescriptionData(data as PrescriptionData);
-      setStep('prescription');
-    } catch (error) {
-      console.error('Failed to process audio:', error);
-      alert('Failed to process audio. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
+  const handlePrescriptionGenerated = (data: PrescriptionData) => {
+    setPrescriptionData(data);
+    setStep('prescription');
   };
 
   const handleNewPatient = () => {
@@ -95,8 +68,6 @@ export function MainApp({ initialPreferences }: MainAppProps) {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-emerald-100 selection:text-emerald-900">
-      
-      {/* Navbar - Hidden when printing */}
       <nav className="bg-white border-b border-slate-200 px-6 py-4 print:hidden sticky top-0 z-50 shadow-sm">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -143,11 +114,11 @@ export function MainApp({ initialPreferences }: MainAppProps) {
             <IntakeForm onComplete={handleIntakeComplete} />
           )}
 
-          {step === 'consultation' && (
+          {step === 'consultation' && patientData && (
             <ActiveConsultation 
-              onGenerate={handleGeneratePrescription}
-              isProcessing={isProcessing}
+              onPrescriptionGenerated={handlePrescriptionGenerated}
               preferences={doctorPreferences}
+              patientData={patientData}
             />
           )}
 
@@ -166,7 +137,6 @@ export function MainApp({ initialPreferences }: MainAppProps) {
           preferences={doctorPreferences}
           onSave={handleSaveSettings}
           onClose={() => {
-            // Only allow close if profile is valid
             if (doctorPreferences.profile.name && doctorPreferences.profile.clinics.length > 0) {
               setShowSettings(false);
             } else {

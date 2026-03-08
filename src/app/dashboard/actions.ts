@@ -70,115 +70,131 @@ export async function saveDoctorPreferences(preferences: DoctorPreferences) {
   return { success: true };
 }
 
-// Gemini Action
+// Gemini Actions
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-export async function processAudioAction(formData: FormData) {
-  if (!genAI) {
-    throw new Error("GEMINI_API_KEY is not set.");
-  }
+// Step 1: Transcribe and Extract (No Search)
+export async function transcribeAudioAction(formData: FormData) {
+  if (!genAI) throw new Error("GEMINI_API_KEY is not set.");
 
   const audioFile = formData.get('audio') as File;
-  const patientDataStr = formData.get('patientData') as string;
   const chiefComplaints = formData.get('chiefComplaints') as string;
-  const preferencesStr = formData.get('preferences') as string;
+  const patientDataStr = formData.get('patientData') as string;
 
   if (!audioFile) throw new Error('No audio file provided');
-
+  
   const patientData = JSON.parse(patientDataStr);
-  const selectedPreferences = JSON.parse(preferencesStr);
 
   const arrayBuffer = await audioFile.arrayBuffer();
   const base64Data = Buffer.from(arrayBuffer).toString('base64');
 
   const prompt = `
-      You are an expert medical assistant for a doctor in Bangladesh. 
-      
-      Patient Details:
-      - Name: ${patientData.name}
-      - Age: ${patientData.age}
-      - Gender: ${patientData.gender || 'Not specified'}
-      - Weight: ${patientData.weight || 'Not specified'}
-      - Height: ${patientData.height || 'Not specified'}
-      - Blood Pressure: ${patientData.bp || 'Not specified'}
-      - Chronic Diseases: ${patientData.chronicDiseases.join(', ') || 'None'}
-      - Known Allergies: ${patientData.allergies || 'None'}
-      
-      Doctor's Initial Notes (Chief Complaints):
-      ${chiefComplaints}
+    You are an expert medical scribe.
+    Patient: ${patientData.name}, Age: ${patientData.age}, Gender: ${patientData.gender}.
+    Doctor's Notes: ${chiefComplaints}
 
-      Doctor's Preferences:
-      - Preferred Pharmaceutical Companies: ${selectedPreferences?.pharmaCompanies?.join(', ') || 'None specified'}
-      - Preferred Diagnostic Centres: ${selectedPreferences?.diagnosticCentres?.join(', ') || 'None specified'}
-      - Preferred Pharmacies: ${selectedPreferences?.pharmacies?.join(', ') || 'None specified'}
-
-      Task:
-      Listen to the doctor-patient conversation provided in the audio and extract the prescription details.
-      Combine the audio information with the provided patient details and doctor's notes.
-      
-      IMPORTANT:
-      - Use the patient's age, gender, weight, height, blood pressure, and medical history to calculate safe dosages and check for contraindications.
-      - Incorporate the chief complaints into the symptoms or diagnosis section if relevant.
-      - If the audio contradicts the initial notes, prioritize the audio but note the discrepancy if significant.
-      
-      MEDICINE SELECTION RULES (CRITICAL):
-      1. **VERIFY WITH GOOGLE SEARCH (medex.com.bd):** You MUST use the \`googleSearch\` tool to verify every medicine. Specifically search for the medicine brand name on \`https://medex.com.bd/\` to ensure it is a valid, currently available product in Bangladesh.
-      2. **Preferred Companies First:** You MUST prioritize medicines from the "Preferred Pharmaceutical Companies" list: [${selectedPreferences?.pharmaCompanies?.join(', ') || 'None specified'}].
-      3. **Exact Brand Search:** For every medicine identified:
-         - Search query example: "site:medex.com.bd [Medicine Name] [Company Name]"
-         - Ensure the brand name matches the company. If the preferred company doesn't make that exact generic, find the equivalent brand they DO make using Medex data.
-      4. **Suggest ALL Options:** Do NOT limit suggestions to a minimum. If multiple valid treatment options or supportive medicines exist based on the diagnosis and notes, include ALL of them.
-      5. **Brand Name Priority:**
-         - If a specific brand is mentioned in the audio, verify it on Medex. If it belongs to a preferred company, use it.
-         - If it doesn't, or if a generic is used, find the brand from a preferred company on Medex.
-      
-      - **Diagnostic Suggestions:** If any tests are recommended, suggest the "Preferred Diagnostic Centres" in the advice section or as a note.
-      - **Pharmacy Suggestions:** Suggest the "Preferred Pharmacies" in the advice section or as a note.
-      
-      Output a JSON object with the following structure:
-      {
-        "patientName": "string (Use provided name: ${patientData.name})",
-        "patientAge": "string (Use provided age: ${patientData.age})",
-        "patientGender": "string (Use provided gender: ${patientData.gender})",
-        "patientWeight": "string (Use provided weight: ${patientData.weight})",
-        "patientHeight": "string (Use provided height: ${patientData.height})",
-        "patientBp": "string (Use provided BP: ${patientData.bp})",
-        "symptoms": ["string", "string"],
-        "diagnosis": ["string", "string"],
-        "medicines": [
-          {
-            "name": "string (Exact Brand Name found on medex.com.bd)",
-            "dosage": "string (e.g., 500mg)",
-            "frequency": "string (e.g., 1+0+1 or Twice daily)",
-            "duration": "string (e.g., 5 days)",
-            "instruction": "string (e.g., After meal)"
-          }
-        ],
-        "advice": ["string", "string"],
-        "recommendedDiagnosticCentre": "string (suggest one from preferences if applicable)",
-        "recommendedPharmacy": "string (suggest one from preferences if applicable)"
-      }
-      
-      Ensure the output is valid JSON. Do not include markdown code blocks.
+    Task:
+    1. Transcribe the audio conversation between doctor and patient accurately.
+    2. Extract ALL symptoms, diagnosis, and a list of ALL medicines mentioned (generic or brand).
+    3. Extract advice and recommended tests.
+    
+    Output a JSON object:
+    {
+      "symptoms": ["string"],
+      "diagnosis": ["string"],
+      "medicines_raw": ["string (name)"],
+      "advice": ["string"],
+      "transcript_summary": "string"
+    }
+    RETURN ONLY JSON.
   `;
 
-  const generateContent = async (model: string) => {
+  const generate = async (model: string) => {
     return await genAI.models.generateContent({
       model: model,
-      contents: {
-        parts: [
-            {
-              inlineData: {
-                mimeType: audioFile.type || 'audio/webm',
-                data: base64Data
-              }
-            },
-            {
-              text: prompt
-            }
+      contents: [
+        {
+          parts: [
+            { inlineData: { mimeType: audioFile.type || 'audio/webm', data: base64Data } },
+            { text: prompt }
           ]
-      },
+        }
+      ],
+      config: { responseMimeType: "application/json" }
+    });
+  };
+
+  try {
+    let response;
+    try {
+      response = await generate("gemini-2.0-flash");
+    } catch (e) {
+      console.warn("Primary model failed, retrying with 1.5-flash...");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      response = await generate("gemini-1.5-flash");
+    }
+
+    const text = response.text;
+    if (!text) throw new Error("No response from AI");
+    
+    return JSON.parse(text);
+  } catch (error: any) {
+    console.error('Transcription Error:', error);
+    throw new Error(`Transcription failed: ${error.message}`);
+  }
+}
+
+// Step 2: Verify and Finalize (With Google Search)
+export async function verifyPrescriptionAction(initialData: any, preferences: any, patientData: any) {
+  if (!genAI) throw new Error("GEMINI_API_KEY is not set.");
+
+  const prompt = `
+    You are an expert medical assistant for a doctor in Bangladesh.
+    
+    Context:
+    - Patient: ${patientData.name}, ${patientData.age}
+    - Initial Findings: ${JSON.stringify(initialData)}
+    - Preferred Pharma Companies: [${preferences?.pharmaCompanies?.join(', ') || 'None'}]
+    - Preferred Diagnostic Centres: [${preferences?.diagnosticCentres?.join(', ') || 'None'}]
+    - Preferred Pharmacies: [${preferences?.pharmacies?.join(', ') || 'None'}]
+
+    CRITICAL TASK (VERIFICATION):
+    1. For every medicine in "medicines_raw", VERIFY it using Google Search on \`medex.com.bd\`.
+    2. Search query pattern: "site:medex.com.bd [Medicine Name] [Preferred Company]".
+    3. If the mentioned medicine is NOT from a preferred company, FIND an equivalent brand from a preferred company using the search.
+    4. If no preferred alternative exists, keep the original but verify its dosage forms available in BD.
+    5. Suggest ALL possible relevant medicines based on diagnosis if they were implied but not explicitly named, ensuring they are from preferred companies.
+
+    Output a FINAL JSON object matching this structure:
+    {
+      "patientName": "${patientData.name}",
+      "patientAge": "${patientData.age}",
+      "patientGender": "${patientData.gender}",
+      "patientWeight": "${patientData.weight || ''}",
+      "patientHeight": "${patientData.height || ''}",
+      "patientBp": "${patientData.bp || ''}",
+      "symptoms": ["string"],
+      "diagnosis": ["string"],
+      "medicines": [
+        {
+          "name": "string (Verified Brand Name from Medex)",
+          "dosage": "string (e.g. 500mg)",
+          "frequency": "string (e.g. 1+0+1)",
+          "duration": "string (e.g. 5 days)",
+          "instruction": "string (e.g. After meal)"
+        }
+      ],
+      "advice": ["string"],
+      "recommendedDiagnosticCentre": "string (suggest from preferences)",
+      "recommendedPharmacy": "string (suggest from preferences)"
+    }
+  `;
+
+  const generate = async (model: string) => {
+    return await genAI.models.generateContent({
+      model: model,
+      contents: [{ parts: [{ text: prompt }] }],
       config: {
         tools: [{ googleSearch: {} }]
       }
@@ -188,29 +204,23 @@ export async function processAudioAction(formData: FormData) {
   try {
     let response;
     try {
-      // Try with the latest model first
-      response = await generateContent("gemini-2.0-flash");
-    } catch (primaryError: any) {
-      console.warn("Primary model (gemini-2.0-flash) failed, attempting fallback...", primaryError.message);
-      // Wait for 2 seconds
+      response = await generate("gemini-2.0-flash");
+    } catch (e) {
+      console.warn("Primary verification model failed, retrying...", e);
       await new Promise(resolve => setTimeout(resolve, 2000));
-      // Fallback to stable model
-      response = await generateContent("gemini-1.5-flash");
+      response = await generate("gemini-1.5-flash");
     }
 
     const text = response.text;
-    if (!text) {
-      console.error('Gemini API Response Empty:', JSON.stringify(response, null, 2));
-      throw new Error("No response from AI");
-    }
-    
-    // Sanitize JSON output (remove markdown code blocks if present)
+    if (!text) throw new Error("No response from AI during verification");
+
+    // Sanitize JSON
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     const jsonString = jsonMatch ? jsonMatch[0] : text;
-
     const data = JSON.parse(jsonString);
-     // Add IDs to medicines for React keys
-     const medicinesWithIds = (data.medicines || []).map((med: any) => ({
+
+    // Add IDs
+    const medicinesWithIds = (data.medicines || []).map((med: any) => ({
       ...med,
       id: crypto.randomUUID()
     }));
@@ -221,10 +231,7 @@ export async function processAudioAction(formData: FormData) {
     };
 
   } catch (error: any) {
-    console.error('Gemini API Error Full:', error);
-    if (error.response) {
-       console.error('Gemini API Error Response:', JSON.stringify(error.response, null, 2));
-    }
-    throw new Error(`Failed to process audio: ${error.message || 'Unknown error'}`);
+    console.error('Verification Error:', error);
+    throw new Error(`Verification failed: ${error.message}`);
   }
 }

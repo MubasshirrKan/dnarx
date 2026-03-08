@@ -1,38 +1,28 @@
+'use client';
+
 import React, { useEffect, useState } from 'react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { motion } from 'motion/react';
-import { Mic, Square, Loader2, FileText, Send, AlertCircle, Activity, Building2, Pill, Stethoscope } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Mic, Loader2, FileText, Send, AlertCircle, Activity, Building2, Pill, Stethoscope } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { DoctorPreferences } from '@/types';
+import { DoctorPreferences, PatientData, PrescriptionData } from '@/types';
+import { transcribeAudioAction, verifyPrescriptionAction } from '@/app/dashboard/actions';
 
 interface ActiveConsultationProps {
-  onGenerate: (
-    audioBlob: Blob, 
-    chiefComplaints: string,
-    selectedPreferences: {
-      diagnosticCentres: string[];
-      pharmaCompanies: string[];
-      pharmacies: string[];
-    }
-  ) => void;
-  isProcessing: boolean;
+  onPrescriptionGenerated: (data: PrescriptionData) => void;
   preferences: DoctorPreferences;
+  patientData: PatientData;
 }
 
-export function ActiveConsultation({ onGenerate, isProcessing, preferences }: ActiveConsultationProps) {
+export function ActiveConsultation({ onPrescriptionGenerated, preferences, patientData }: ActiveConsultationProps) {
   const { isRecording, recordingTime, audioBlob, error, startRecording, stopRecording } = useAudioRecorder();
   const [chiefComplaints, setChiefComplaints] = useState('');
-  const [isFinishing, setIsFinishing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<string | null>(null);
 
   // Selection states
   const [selectedDiagnosticCentres, setSelectedDiagnosticCentres] = useState<string[]>([]);
   const [selectedPharmaCompanies, setSelectedPharmaCompanies] = useState<string[]>([]);
   const [selectedPharmacies, setSelectedPharmacies] = useState<string[]>([]);
-
-  // Initialize selections with all available preferences by default or empty?
-  // User said "option to select preferred... based on the suggestion the final prescription will be generate"
-  // Let's default to empty, so they can select specific ones relevant for this patient if they want.
-  // Or maybe pre-select all? Let's start empty but show them clearly.
 
   const toggleSelection = (
     item: string, 
@@ -46,27 +36,49 @@ export function ActiveConsultation({ onGenerate, isProcessing, preferences }: Ac
     }
   };
 
-  // Auto-start recording on mount
   useEffect(() => {
     startRecording();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Trigger generation once audio blob is ready after stopping
-  useEffect(() => {
-    if (isFinishing && audioBlob) {
-      onGenerate(audioBlob, chiefComplaints, {
+  const handleProcess = async () => {
+    if (!audioBlob) return;
+    
+    // Stop recording if still active
+    if (isRecording) {
+      stopRecording();
+    }
+
+    try {
+      // Step 1: Transcribe
+      setProcessingStatus("Uploading and Transcribing Audio...");
+      
+      const formData = new FormData();
+      formData.append('audio', audioBlob);
+      formData.append('patientData', JSON.stringify(patientData));
+      formData.append('chiefComplaints', chiefComplaints);
+
+      const initialData = await transcribeAudioAction(formData);
+
+      // Step 2: Verify
+      setProcessingStatus("Verifying medicines with Medex...");
+      
+      const selectedPreferences = {
         diagnosticCentres: selectedDiagnosticCentres,
         pharmaCompanies: selectedPharmaCompanies,
         pharmacies: selectedPharmacies
-      });
-      setIsFinishing(false);
-    }
-  }, [audioBlob, isFinishing, onGenerate, chiefComplaints, selectedDiagnosticCentres, selectedPharmaCompanies, selectedPharmacies]);
+      };
 
-  const handleGenerate = () => {
-    stopRecording();
-    setIsFinishing(true);
+      const finalData = await verifyPrescriptionAction(initialData, selectedPreferences, patientData);
+
+      setProcessingStatus("Finalizing Prescription...");
+      onPrescriptionGenerated(finalData as PrescriptionData);
+
+    } catch (e: any) {
+      console.error(e);
+      setProcessingStatus(null);
+      alert(`Failed to process: ${e.message || 'Unknown error'}`);
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -76,8 +88,28 @@ export function ActiveConsultation({ onGenerate, isProcessing, preferences }: Ac
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-6">
+    <div className="w-full max-w-6xl mx-auto space-y-6 relative pb-20">
       
+      {/* Floating Status Bar */}
+      <AnimatePresence>
+        {processingStatus && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 backdrop-blur-md text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-4 border border-slate-700 min-w-[320px]"
+          >
+            <div className="relative">
+               <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-emerald-50">{processingStatus}</p>
+              <p className="text-xs text-slate-400">AI Medical Assistant is working...</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header Status */}
       <div className="flex items-center justify-between bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div className="flex items-center gap-4">
@@ -259,16 +291,16 @@ export function ActiveConsultation({ onGenerate, isProcessing, preferences }: Ac
             </h3>
             
             <button
-              onClick={handleGenerate}
-              disabled={isProcessing || (!isRecording && !audioBlob)}
+              onClick={handleProcess}
+              disabled={!!processingStatus || (!isRecording && !audioBlob)}
               className={cn(
                 "w-full py-4 rounded-xl font-semibold text-white shadow-lg transition-all flex items-center justify-center gap-2",
-                isProcessing 
+                processingStatus 
                   ? "bg-slate-400 cursor-not-allowed"
                   : "bg-emerald-600 hover:bg-emerald-700 hover:scale-[1.02] active:scale-[0.98] shadow-emerald-200"
               )}
             >
-              {isProcessing ? (
+              {processingStatus ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
                   Processing...
@@ -282,18 +314,8 @@ export function ActiveConsultation({ onGenerate, isProcessing, preferences }: Ac
             </button>
 
             <p className="text-xs text-slate-500 text-center leading-relaxed">
-              Clicking generate will stop the recording and process audio, notes, and preferences to create the prescription.
+              Clicking generate will stop the recording, transcribe, verify with Medex, and create the prescription.
             </p>
-          </div>
-
-          {/* Tips */}
-          <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100">
-            <h4 className="text-blue-900 font-medium mb-2 text-sm">Pro Tips:</h4>
-            <ul className="text-sm text-blue-700 space-y-2 list-disc pl-4">
-              <li>Speak clearly near the microphone.</li>
-              <li>Mention specific symptoms and duration.</li>
-              <li>Select preferred pharma companies to get tailored medicine suggestions.</li>
-            </ul>
           </div>
         </div>
       </div>
