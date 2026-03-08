@@ -64,7 +64,6 @@ export function PrescriptionEditor({ initialData, onBack, preferences }: Prescri
           diagnosis: data.diagnosis
         });
         
-        // Only update if we are still on the same input
         setSuggestions(results as Medicine[]);
       } catch (e) {
         console.error(e);
@@ -72,7 +71,7 @@ export function PrescriptionEditor({ initialData, onBack, preferences }: Prescri
       } finally {
         setIsSearching(false);
       }
-    }, 600); // 600ms debounce
+    }, 400); // Reduced debounce for better feel
   };
 
   const selectSuggestion = (id: string, suggestion: Medicine) => {
@@ -455,6 +454,11 @@ export function PrescriptionEditor({ initialData, onBack, preferences }: Prescri
                                   </button>
                                 </li>
                               ))}
+                              {!isSearching && suggestions.length === 0 && med.name.length >= 2 && (
+                                <li className="p-3 text-center text-xs text-slate-400 italic">
+                                  No verified suggestions found for this name.
+                                </li>
+                              )}
                            </ul>
                         </div>
                       )}

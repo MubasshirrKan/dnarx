@@ -243,55 +243,33 @@ export async function searchMedicineAction(query: string, preferences: any, pati
   if (query.length < 2) return [];
 
   const prompt = `
-    You are an intelligent medical assistant in Bangladesh.
-    Doctor is typing: "${query}"
+    Search medex.com.bd and suggest 3-5 specific Brand medicines in Bangladesh for: "${query}".
+    Context: Patient age ${patientContext.patientAge}, Diagnosis: ${patientContext.diagnosis?.join(', ')}.
+    Preferred Pharma: [${preferences?.pharmaCompanies?.join(', ')}].
     
-    Patient: ${patientContext.patientAge} years old, Diagnosis: ${patientContext.diagnosis?.join(', ')}
-    Preferred Pharma: [${preferences?.pharmaCompanies?.join(', ')}]
-
-    Task:
-    1. Search \`medex.com.bd\` for brand names starting with or matching "${query}".
-    2. Prioritize brands from the "Preferred Pharma Companies". If the preferred company doesn't make it, suggest other reputable brands.
-    3. **STRICT RULE:** NEVER suggest vague names like "Painkiller", "Antibiotic", etc. ALWAYS suggest specific Brand Names (e.g., "Napa", "Seclo").
-    4. Ensure suggestions are appropriate for a ${patientContext.patientAge} year old.
-    5. Format strictly as JSON.
-
-    [
-      {
-        "name": "Brand Name",
-        "dosage": "500mg",
-        "frequency": "1+0+1",
-        "duration": "5 days",
-        "instruction": "After meal"
-      }
-    ]
+    STRICT: ONLY Brand names, NO vague categories.
+    
+    Return EXACTLY this JSON format:
+    [{"name": "Napa Extra", "dosage": "500mg", "frequency": "1+0+1", "duration": "5 days", "instruction": "After meal"}]
   `;
 
   try {
+    // Using Flash for much faster autocomplete speed
     const response = await genAI.models.generateContent({
-      model: "gemini-1.5-pro",
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: "application/json",
-      }
+      model: "gemini-1.5-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
 
     const text = response.text;
     if (!text) return [];
-    return JSON.parse(text);
+    
+    // Robust JSON extraction
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    const jsonString = jsonMatch ? jsonMatch[0] : text;
+    return JSON.parse(jsonString);
   } catch (error) {
     console.error('Autocomplete Error:', error);
-    try {
-      const response = await genAI.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: [{ role: "user", parts: [{ text: prompt }] }]
-      });
-      const text = response.text;
-      const jsonMatch = text?.match(/\[[\s\S]*\]/);
-      return JSON.parse(jsonMatch ? jsonMatch[0] : "[]");
-    } catch (e) {
-      return [];
-    }
+    return [];
   }
 }
 
