@@ -180,7 +180,7 @@ export async function transcribeAudioAction(formData: FormData) {
     // Attach the raw transcribed text so the frontend can optionally display/use it if needed
     parsedData.raw_transcription = transcribedText;
     
-    return parsedData;
+    return JSON.stringify(parsedData);
   } catch (error: any) {
     console.error('Extraction Error:', error);
     const errorCode = error.status || error.code || error.statusCode || 'UNKNOWN';
@@ -189,9 +189,12 @@ export async function transcribeAudioAction(formData: FormData) {
 }
 
 // Step 2: Verify and Finalize (With Google Search)
-export async function verifyPrescriptionAction(initialData: any, preferences: any, patientData: any, previousHistoryStr: string = "[]") {
+export async function verifyPrescriptionAction(initialDataStr: string, preferencesStr: string, patientDataStr: string, previousHistoryStr: string = "[]") {
   if (!genAI) throw new Error("GEMINI_API_KEY is not set.");
 
+  const initialData = JSON.parse(initialDataStr);
+  const preferences = JSON.parse(preferencesStr);
+  const patientData = JSON.parse(patientDataStr);
   const previousHistory = JSON.parse(previousHistoryStr);
 
   let historyContext = "";
@@ -286,10 +289,10 @@ export async function verifyPrescriptionAction(initialData: any, preferences: an
       id: crypto.randomUUID()
     }));
 
-    return {
+    return JSON.stringify({
       ...data,
       medicines: medicinesWithIds
-    };
+    });
 
   } catch (error: any) {
     console.error('Verification Error:', error);
