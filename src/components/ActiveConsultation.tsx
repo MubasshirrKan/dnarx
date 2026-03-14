@@ -20,6 +20,7 @@ export function ActiveConsultation({ onPrescriptionGenerated, preferences, patie
   const [chiefComplaints, setChiefComplaints] = useState('');
   const [isFinishing, setIsFinishing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
+  const [transcribedText, setTranscribedText] = useState<string | null>(null);
   const [processError, setProcessError] = useState<string | null>(null);
 
   // Selection states
@@ -67,6 +68,7 @@ export function ActiveConsultation({ onPrescriptionGenerated, preferences, patie
           }
 
           const initialData = initialDataRes.data;
+          setTranscribedText(initialData.raw_transcription || null);
 
           // Step 2: Verify
           setProcessingStatus("Verifying medicines with Medex...");
@@ -134,14 +136,21 @@ export function ActiveConsultation({ onPrescriptionGenerated, preferences, patie
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 backdrop-blur-md text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-4 border border-slate-700 min-w-[320px]"
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 backdrop-blur-md text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border border-slate-700 min-w-[320px] max-w-[90vw]"
           >
-            <div className="relative">
+            <div className="relative shrink-0">
                <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 overflow-hidden">
               <p className="text-sm font-medium text-emerald-50">{processingStatus}</p>
-              <p className="text-xs text-slate-400">AI Medical Assistant is working...</p>
+              {transcribedText ? (
+                <div className="mt-1 p-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                   <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-1">ElevenLabs Transcription:</p>
+                   <p className="text-xs text-slate-200 line-clamp-2 italic italic italic italic italic">"{transcribedText}"</p>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 italic">Processing audio through ElevenLabs...</p>
+              )}
             </div>
           </motion.div>
         )}
