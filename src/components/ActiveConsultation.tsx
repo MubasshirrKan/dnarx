@@ -70,7 +70,7 @@ export function ActiveConsultation({ onPrescriptionGenerated, preferences, patie
             pharmacies: selectedPharmacies
           };
 
-          const finalData = await verifyPrescriptionAction(initialData, selectedPreferences, patientData, patientHistory);
+          const finalData = await verifyPrescriptionAction(initialData, selectedPreferences, patientData, JSON.stringify(patientHistory));
 
           setProcessingStatus("Finalizing Prescription...");
           onPrescriptionGenerated(finalData as PrescriptionData);

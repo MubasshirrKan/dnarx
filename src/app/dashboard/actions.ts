@@ -189,8 +189,10 @@ export async function transcribeAudioAction(formData: FormData) {
 }
 
 // Step 2: Verify and Finalize (With Google Search)
-export async function verifyPrescriptionAction(initialData: any, preferences: any, patientData: any, previousHistory: any[] = []) {
+export async function verifyPrescriptionAction(initialData: any, preferences: any, patientData: any, previousHistoryStr: string = "[]") {
   if (!genAI) throw new Error("GEMINI_API_KEY is not set.");
+
+  const previousHistory = JSON.parse(previousHistoryStr);
 
   let historyContext = "";
   if (previousHistory && previousHistory.length > 0) {
