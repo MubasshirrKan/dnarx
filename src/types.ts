@@ -9,6 +9,7 @@ export interface Medicine {
 
 export interface PatientData {
   name: string;
+  phone?: string;
   age: string;
   gender: string;
   weight?: string;
@@ -20,6 +21,7 @@ export interface PatientData {
 
 export interface PrescriptionData {
   patientName?: string;
+  patientPhone?: string;
   patientAge?: string;
   patientGender?: string;
   patientWeight?: string;

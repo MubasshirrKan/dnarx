@@ -171,6 +171,7 @@ export async function verifyPrescriptionAction(initialData: any, preferences: an
     Output a FINAL JSON object matching this structure:
     {
       "patientName": "${patientData.name}",
+      "patientPhone": "${patientData.phone || ''}",
       "patientAge": "${patientData.age}",
       "patientGender": "${patientData.gender}",
       "patientWeight": "${patientData.weight || ''}",
@@ -276,8 +277,8 @@ export async function searchMedicineAction(query: string, preferences: any, pati
 export async function savePrescription(data: any) {
   const session = await getSession();
   
-  // Extract patient phone if available, or leave null
-  const patientPhone = null; 
+  // Extract patient phone if available
+  const patientPhone = data.patientPhone || null; 
 
   // Check for duplicate within the last 2 minutes
   const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
@@ -319,4 +320,24 @@ export async function savePrescription(data: any) {
   });
 
   return { success: true };
+}
+
+export async function getPatientHistoryAction(phoneNumber: string) {
+  const session = await getSession();
+
+  if (!phoneNumber) {
+    return [];
+  }
+
+  const prescriptions = await prisma.prescription.findMany({
+    where: {
+      doctorId: session.user.id,
+      patientPhone: phoneNumber,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  return prescriptions;
 }

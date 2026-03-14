@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { User, Calendar, Weight, Activity, AlertCircle, ArrowRight, Ruler, HeartPulse } from 'lucide-react';
+import { User, Calendar, Weight, Activity, AlertCircle, ArrowRight, Ruler, HeartPulse, Search, Phone, History } from 'lucide-react';
 import { PatientData } from '@/types';
 import { cn } from '@/lib/utils';
+import { getPatientHistoryAction } from '@/app/dashboard/actions';
 
 interface IntakeFormProps {
   onComplete: (data: PatientData) => void;
@@ -20,6 +21,7 @@ const CHRONIC_DISEASES_CATEGORIES = {
 export function IntakeForm({ onComplete }: IntakeFormProps) {
   const [formData, setFormData] = useState<PatientData>({
     name: '',
+    phone: '',
     age: '',
     gender: '',
     weight: '',
@@ -28,6 +30,38 @@ export function IntakeForm({ onComplete }: IntakeFormProps) {
     chronicDiseases: [],
     allergies: ''
   });
+
+  const [isSearching, setIsSearching] = useState(false);
+  const [patientHistory, setPatientHistory] = useState<any[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  const handleSearchHistory = async () => {
+    if (!formData.phone) return;
+    setIsSearching(true);
+    try {
+      const history = await getPatientHistoryAction(formData.phone);
+      setPatientHistory(history);
+      setShowHistory(true);
+      
+      // Auto-fill some fields if history is found and current fields are empty
+      if (history.length > 0) {
+        const latest = history[0];
+        const latestPatientData = latest.patientData as any;
+        setFormData(prev => ({
+          ...prev,
+          name: prev.name || latest.patientName || '',
+          age: prev.age || latestPatientData?.age || '',
+          gender: prev.gender || latestPatientData?.gender || '',
+          weight: prev.weight || latestPatientData?.weight || '',
+          height: prev.height || latestPatientData?.height || '',
+        }));
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const toggleDisease = (disease: string) => {
     setFormData(prev => {
@@ -53,6 +87,95 @@ export function IntakeForm({ onComplete }: IntakeFormProps) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        
+        {/* Patient Phone and History Search */}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+              <Phone className="w-4 h-4 text-emerald-500" />
+              Patient Phone Number
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="tel"
+                value={formData.phone || ''}
+                onChange={e => {
+                  setFormData(prev => ({ ...prev, phone: e.target.value }));
+                  if (showHistory) setShowHistory(false);
+                }}
+                className="flex-1 px-4 py-2 rounded-lg border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all"
+                placeholder="e.g. 01XXXXXXXXX"
+              />
+              <button
+                type="button"
+                onClick={handleSearchHistory}
+                disabled={!formData.phone || isSearching}
+                className="px-5 py-2 bg-emerald-100 text-emerald-800 rounded-lg hover:bg-emerald-200 font-medium flex items-center gap-2 disabled:opacity-50 transition-all border border-emerald-200"
+              >
+                {isSearching ? <Activity className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                Search History
+              </button>
+            </div>
+          </div>
+
+          {/* History Display */}
+          {showHistory && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }} 
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-emerald-50/50 rounded-xl p-5 border border-emerald-100 shadow-inner"
+            >
+              <h3 className="text-sm font-semibold text-emerald-900 flex items-center gap-2 mb-4">
+                <History className="w-4 h-4 text-emerald-600" />
+                Previous Consultations ({patientHistory.length} found)
+              </h3>
+              
+              {patientHistory.length > 0 ? (
+                <div className="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                  {patientHistory.map((record) => {
+                    const pData = record.prescriptionData as any;
+                    return (
+                    <div key={record.id} className="bg-white p-4 rounded-lg border border-emerald-100 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="font-semibold text-emerald-800 text-sm">
+                          {new Date(record.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </span>
+                        <span className="text-xs font-medium px-2 py-1 bg-slate-100 rounded-md text-slate-600">
+                          {pData?.diagnosis?.[0] || 'Unspecified'}
+                        </span>
+                      </div>
+                      
+                      {pData?.symptoms && pData.symptoms.length > 0 && (
+                        <p className="text-slate-600 text-xs mb-2 line-clamp-2">
+                          <span className="font-medium text-slate-700">Symptoms:</span> {pData.symptoms.join(', ')}
+                        </p>
+                      )}
+                      
+                      {pData?.medicines && pData.medicines.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-slate-50 flex flex-wrap gap-1">
+                          {pData.medicines.slice(0, 3).map((med: any, i: number) => (
+                            <span key={i} className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100">
+                              {med.name}
+                            </span>
+                          ))}
+                          {pData.medicines.length > 3 && (
+                            <span className="text-[10px] text-slate-500 px-1.5 py-0.5">+{pData.medicines.length - 3} more</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )})}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-slate-500 text-sm">
+                  <User className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                  No previous records found for this phone number.
+                </div>
+              )}
+            </motion.div>
+          )}
+        </div>
+
         {/* Basic Vitals */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Name */}
