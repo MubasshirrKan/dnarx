@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { User, Calendar, Weight, Activity, AlertCircle, ArrowRight, Ruler, HeartPulse, Phone } from 'lucide-react';
+import { User, Calendar, Weight, Activity, AlertCircle, ArrowRight, Ruler, HeartPulse, Phone, Plus, X } from 'lucide-react';
 import { PatientData } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -33,6 +33,9 @@ export function IntakeForm({ onComplete, initialData }: IntakeFormProps) {
     }
   );
 
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customDiseaseName, setCustomDiseaseName] = useState('');
+
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
@@ -47,6 +50,24 @@ export function IntakeForm({ onComplete, initialData }: IntakeFormProps) {
       return { ...prev, chronicDiseases: newDiseases };
     });
   };
+
+  const handleAddCustomDisease = () => {
+    if (customDiseaseName.trim() !== '') {
+      const formattedDisease = customDiseaseName.trim();
+      if (!formData.chronicDiseases.includes(formattedDisease)) {
+        setFormData(prev => ({
+          ...prev,
+          chronicDiseases: [...prev.chronicDiseases, formattedDisease]
+        }));
+      }
+      setCustomDiseaseName('');
+      setShowCustomInput(false);
+    }
+  };
+
+  // Derive custom diseases selected but not in the default list
+  const allDefaultDiseases = Object.values(CHRONIC_DISEASES_CATEGORIES).flat();
+  const customSelectedDiseases = formData.chronicDiseases.filter(d => !allDefaultDiseases.includes(d));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,12 +202,70 @@ export function IntakeForm({ onComplete, initialData }: IntakeFormProps) {
 
         {/* Chronic Diseases */}
         <div className="space-y-4">
-          <label className="text-sm font-medium text-slate-700 flex items-center gap-2 border-b border-slate-100 pb-2">
-            <Activity className="w-4 h-4 text-emerald-500" />
-            Chronic Diseases
-          </label>
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-emerald-500" />
+              Chronic Diseases
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowCustomInput(!showCustomInput)}
+              className="text-xs flex items-center gap-1 font-medium text-emerald-600 hover:text-emerald-700 transition-colors bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg"
+            >
+              {showCustomInput ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+              {showCustomInput ? 'Cancel' : 'Add Custom'}
+            </button>
+          </div>
           
+          {showCustomInput && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="flex items-center gap-2 mb-4"
+            >
+              <input
+                type="text"
+                value={customDiseaseName}
+                onChange={(e) => setCustomDiseaseName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddCustomDisease();
+                  }
+                }}
+                placeholder="Type custom disease name..."
+                className="flex-1 px-3 py-2 text-sm rounded-lg border border-emerald-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all"
+              />
+              <button
+                type="button"
+                onClick={handleAddCustomDisease}
+                disabled={!customDiseaseName.trim()}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                Add
+              </button>
+            </motion.div>
+          )}
+
           <div className="space-y-6">
+            {customSelectedDiseases.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Custom (Added)</h3>
+                <div className="flex flex-wrap gap-2">
+                  {customSelectedDiseases.map(disease => (
+                    <button
+                      key={disease}
+                      type="button"
+                      onClick={() => toggleDisease(disease)}
+                      className="px-3 py-1.5 rounded-full text-xs font-medium transition-all border bg-emerald-100 text-emerald-700 border-emerald-200 shadow-sm"
+                    >
+                      {disease}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {Object.entries(CHRONIC_DISEASES_CATEGORIES).map(([category, diseases]) => (
               <div key={category} className="space-y-2">
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{category}</h3>
