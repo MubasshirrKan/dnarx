@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 import { DoctorPreferences } from '@/types';
 import { GoogleGenAI } from "@google/genai";
+import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { revalidatePath } from 'next/cache';
 import { Buffer } from 'node:buffer';
 
@@ -74,9 +75,14 @@ export async function saveDoctorPreferences(preferences: DoctorPreferences) {
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-// Step 1: Transcribe and Extract (No Search)
+// ElevenLabs Client
+const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
+const elevenlabs = elevenLabsApiKey ? new ElevenLabsClient({ apiKey: elevenLabsApiKey }) : null;
+
+// Step 1: Transcribe and Extract (Using ElevenLabs for Speech-to-Text)
 export async function transcribeAudioAction(formData: FormData) {
   if (!genAI) throw new Error("GEMINI_API_KEY is not set.");
+  if (!elevenlabs) throw new Error("ELEVENLABS_API_KEY is not set.");
 
   const audioFile = formData.get('audio') as File;
   const chiefComplaints = formData.get('chiefComplaints') as string;
@@ -85,6 +91,26 @@ export async function transcribeAudioAction(formData: FormData) {
 
   if (!audioFile) throw new Error('No audio file provided');
   
+  // Step 1a: Transcribe Audio using ElevenLabs
+  let transcribedText = "";
+  try {
+    const audioBlob = new Blob([await audioFile.arrayBuffer()], { type: audioFile.type || "audio/webm" });
+    const transcription = await elevenlabs.speechToText.convert({
+      file: audioBlob,
+      modelId: "scribe_v2", // using scribe_v2 as per instructions
+      tagAudioEvents: true,
+      // Omit languageCode to let the model auto-detect
+      diarize: true, 
+    });
+    
+    // ElevenLabs SDK returns an object with a text property
+    transcribedText = transcription.text;
+  } catch (error: any) {
+    console.error('ElevenLabs Transcription Error:', error);
+    throw new Error(`Speech-to-Text failed: ${error.message}`);
+  }
+
+  // Step 1b: Use Gemini to Extract Medical Information
   const patientData = JSON.parse(patientDataStr);
   const previousHistory = previousHistoryStr ? JSON.parse(previousHistoryStr) : [];
 
@@ -101,19 +127,21 @@ export async function transcribeAudioAction(formData: FormData) {
     historyContext += "Use this previous history, including the previous dates and prescribed medicines, to inform your current diagnosis, adjust medications (e.g., continuing or changing based on progress), and mention the relevant history in the transcript summary if needed.\n---------------------------------------\n";
   }
 
-  const arrayBuffer = await audioFile.arrayBuffer();
-  const base64Data = Buffer.from(arrayBuffer).toString('base64');
-
   const prompt = `
     You are an expert medical scribe.
     Patient: ${patientData.name}, Age: ${patientData.age}, Gender: ${patientData.gender}.
     Doctor's Notes: ${chiefComplaints}
     ${historyContext}
+    
+    --- TRANSCRIBED CONVERSATION ---
+    ${transcribedText}
+    --------------------------------
 
     Task:
-    1. Transcribe the audio conversation between doctor and patient accurately.
+    1. Read the provided transcribed conversation between the doctor and patient.
     2. Extract ALL symptoms, diagnosis, and a list of ALL medicines mentioned (generic or brand). Use the previous history to infer context if the doctor refers to "the same medicine as last time" or "from the last visit on [Date]".
     3. Extract advice and recommended tests. For tests, ALWAYS use the standard, formal medical terminology (the "bookish" name, e.g., "Complete Blood Count (CBC)", "Ultrasonography of Whole Abdomen").
+    4. Provide a brief transcript_summary based on the provided text.
     
     Output a JSON object:
     {
@@ -129,14 +157,7 @@ export async function transcribeAudioAction(formData: FormData) {
   const generate = async (model: string) => {
     return await genAI.models.generateContent({
       model: model,
-      contents: [
-        {
-          parts: [
-            { inlineData: { mimeType: audioFile.type || 'audio/webm', data: base64Data } },
-            { text: prompt }
-          ]
-        }
-      ],
+      contents: [{ parts: [{ text: prompt }] }],
       config: { responseMimeType: "application/json" }
     });
   };
@@ -144,7 +165,7 @@ export async function transcribeAudioAction(formData: FormData) {
   try {
     let response;
     try {
-      response = await generate("gemini-2.0-flash");
+      response = await generate("gemini-3-pro-preview");
     } catch (e) {
       console.warn("Primary model failed, retrying with 1.5-flash...");
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -154,10 +175,14 @@ export async function transcribeAudioAction(formData: FormData) {
     const text = response.text;
     if (!text) throw new Error("No response from AI");
     
-    return JSON.parse(text);
+    const parsedData = JSON.parse(text);
+    // Attach the raw transcribed text so the frontend can optionally display/use it if needed
+    parsedData.raw_transcription = transcribedText;
+    
+    return parsedData;
   } catch (error: any) {
-    console.error('Transcription Error:', error);
-    throw new Error(`Transcription failed: ${error.message}`);
+    console.error('Extraction Error:', error);
+    throw new Error(`Data extraction failed: ${error.message}`);
   }
 }
 
@@ -236,7 +261,7 @@ export async function verifyPrescriptionAction(initialData: any, preferences: an
   try {
     let response;
     try {
-      response = await generate("gemini-2.0-flash");
+      response = await generate("gemini-3-pro-preview");
     } catch (e) {
       console.warn("Primary verification model failed, retrying...", e);
       await new Promise(resolve => setTimeout(resolve, 2000));
