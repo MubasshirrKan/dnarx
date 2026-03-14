@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
-import { User, Calendar, Weight, Activity, AlertCircle, ArrowRight, Ruler, HeartPulse, Phone, Plus, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { User, Calendar, Weight, Activity, AlertCircle, ArrowRight, Ruler, HeartPulse, Phone, Plus, X, Search, History } from 'lucide-react';
 import { PatientData } from '@/types';
 import { cn } from '@/lib/utils';
+import { getPatientHistoryAction } from '@/app/dashboard/actions';
 
 interface IntakeFormProps {
   onComplete: (data: PatientData) => void;
   initialData?: PatientData;
+  setPatientHistory?: (history: any[]) => void;
 }
 
 const CHRONIC_DISEASES_CATEGORIES = {
@@ -18,7 +20,7 @@ const CHRONIC_DISEASES_CATEGORIES = {
   "Other": ['Cancer', 'Chronic Kidney Disease', 'Liver Disease', 'HIV/AIDS', 'Hepatitis', 'Digestive Problems']
 };
 
-export function IntakeForm({ onComplete, initialData }: IntakeFormProps) {
+export function IntakeForm({ onComplete, initialData, setPatientHistory }: IntakeFormProps) {
   const [formData, setFormData] = useState<PatientData>(
     initialData || {
       name: '',
@@ -36,11 +38,80 @@ export function IntakeForm({ onComplete, initialData }: IntakeFormProps) {
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customDiseaseName, setCustomDiseaseName] = useState('');
 
+  // Real-time Search State
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
     }
   }, [initialData]);
+
+  // Debounced search effect
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (formData.phone && formData.phone.length >= 6) { // Search if at least 6 digits
+        setIsSearching(true);
+        try {
+          const history = await getPatientHistoryAction(formData.phone);
+          setSearchResults(history);
+          setShowSearchResults(true);
+        } catch (error) {
+          console.error("Search error:", error);
+        } finally {
+          setIsSearching(false);
+        }
+      } else {
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [formData.phone]);
+
+
+  const handleSelectSearchResult = (record: any) => {
+    const latestPatientData = record.patientData || {};
+    
+    // Calculate Age based on previous record
+    let currentAge = latestPatientData.age;
+    if (latestPatientData.age && !isNaN(Number(latestPatientData.age))) {
+      const recordDate = new Date(record.createdAt);
+      const today = new Date();
+      
+      let ageDiff = today.getFullYear() - recordDate.getFullYear();
+      const m = today.getMonth() - recordDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < recordDate.getDate())) {
+          ageDiff--;
+      }
+      
+      if (ageDiff > 0) {
+        currentAge = (Number(latestPatientData.age) + ageDiff).toString();
+      }
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      name: record.patientName || prev.name,
+      age: currentAge || prev.age,
+      gender: latestPatientData.gender || prev.gender,
+      height: latestPatientData.height || prev.height,
+      weight: latestPatientData.weight || prev.weight,
+      chronicDiseases: latestPatientData.chronicDiseases?.length > 0 ? latestPatientData.chronicDiseases : prev.chronicDiseases,
+    }));
+
+    if (setPatientHistory) {
+      // Pass the relevant history up to MainApp
+      const recordsForPatient = searchResults.filter(r => r.patientName === record.patientName);
+      setPatientHistory(recordsForPatient);
+    }
+
+    setShowSearchResults(false);
+  };
+
 
   const toggleDisease = (disease: string) => {
     setFormData(prev => {
@@ -87,20 +158,83 @@ export function IntakeForm({ onComplete, initialData }: IntakeFormProps) {
         
         {/* Basic Vitals */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Phone (Mandatory identifier) */}
-          <div className="space-y-2 md:col-span-2">
-            <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-              <Phone className="w-4 h-4 text-emerald-500" />
-              Patient Phone Number <span className="text-rose-500">*</span>
+          {/* Phone (Mandatory identifier) with Real-time Search */}
+          <div className="space-y-2 md:col-span-2 relative">
+            <label className="text-sm font-medium text-slate-700 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Phone className="w-4 h-4 text-emerald-500" />
+                Patient Phone Number <span className="text-rose-500">*</span>
+              </span>
+              {isSearching && (
+                <span className="text-xs text-slate-400 flex items-center gap-1">
+                  <Activity className="w-3 h-3 animate-spin text-emerald-500" />
+                  Searching...
+                </span>
+              )}
             </label>
-            <input
-              type="tel"
-              required
-              value={formData.phone}
-              onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-              className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all"
-              placeholder="e.g. 01XXXXXXXXX"
-            />
+            <div className="relative">
+              <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="tel"
+                required
+                value={formData.phone}
+                onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                onFocus={() => { if (searchResults.length > 0) setShowSearchResults(true); }}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all"
+                placeholder="e.g. 01XXXXXXXXX"
+              />
+            </div>
+
+            {/* Dropdown for Realtime Search Results */}
+            <AnimatePresence>
+              {showSearchResults && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden z-50"
+                >
+                  <div className="p-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Search Results</span>
+                    <button type="button" onClick={() => setShowSearchResults(false)} className="text-xs text-slate-400 hover:text-slate-700 p-1">Close</button>
+                  </div>
+                  {searchResults.length > 0 ? (
+                    <div className="max-h-[40vh] overflow-y-auto">
+                      {Array.from(new Set(searchResults.map(r => r.patientName))).map((uniqueName, index) => {
+                        const recordsForPatient = searchResults.filter(r => r.patientName === uniqueName);
+                        const latestRecord = recordsForPatient[0];
+                        return (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => handleSelectSearchResult(latestRecord)}
+                            className="w-full text-left p-4 hover:bg-emerald-50 border-b border-slate-50 transition-colors flex flex-col gap-1 last:border-0"
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className="font-semibold text-slate-800">{latestRecord.patientName || 'Unknown Patient'}</span>
+                              <span className="text-xs text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full font-medium">
+                                {recordsForPatient.length} Visit(s)
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-500 flex gap-3">
+                              <span>Last Visit: {new Date(latestRecord.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            <div className="text-xs text-slate-400 mt-1 line-clamp-1">
+                              Latest Diagnosis: {latestRecord.prescriptionData?.diagnosis?.join(', ') || 'N/A'}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center text-sm text-slate-500 flex flex-col items-center gap-2">
+                      <History className="w-6 h-6 text-slate-300" />
+                      No previous records found.
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Name */}
