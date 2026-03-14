@@ -59,8 +59,14 @@ export function ActiveConsultation({ onPrescriptionGenerated, preferences, patie
           formData.append('chiefComplaints', chiefComplaints);
           formData.append('previousHistory', JSON.stringify(patientHistory));
 
-          const initialDataStr = await transcribeAudioAction(formData);
-          const initialData = JSON.parse(initialDataStr);
+          const initialDataResStr = await transcribeAudioAction(formData);
+          const initialDataRes = JSON.parse(initialDataResStr);
+
+          if (!initialDataRes.success) {
+            throw new Error(initialDataRes.error || "Transcription failed");
+          }
+
+          const initialData = initialDataRes.data;
 
           // Step 2: Verify
           setProcessingStatus("Verifying medicines with Medex...");
@@ -71,14 +77,20 @@ export function ActiveConsultation({ onPrescriptionGenerated, preferences, patie
             pharmacies: selectedPharmacies
           };
 
-          const finalDataStr = await verifyPrescriptionAction(
+          const finalDataResStr = await verifyPrescriptionAction(
             JSON.stringify(initialData), 
             JSON.stringify(selectedPreferences), 
             JSON.stringify(patientData), 
             JSON.stringify(patientHistory)
           );
           
-          const finalData = JSON.parse(finalDataStr);
+          const finalDataRes = JSON.parse(finalDataResStr);
+
+          if (!finalDataRes.success) {
+             throw new Error(finalDataRes.error || "Verification failed");
+          }
+
+          const finalData = finalDataRes.data;
 
           setProcessingStatus("Finalizing Prescription...");
           onPrescriptionGenerated(finalData as PrescriptionData);

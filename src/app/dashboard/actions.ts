@@ -81,89 +81,89 @@ const elevenlabs = elevenLabsApiKey ? new ElevenLabsClient({ apiKey: elevenLabsA
 
 // Step 1: Transcribe and Extract (Using ElevenLabs for Speech-to-Text)
 export async function transcribeAudioAction(formData: FormData) {
-  if (!genAI) throw new Error("GEMINI_API_KEY is not set.");
-  if (!elevenlabs) throw new Error("ELEVENLABS_API_KEY is not set.");
-
-  const audioFile = formData.get('audio') as File;
-  const chiefComplaints = formData.get('chiefComplaints') as string;
-  const patientDataStr = formData.get('patientData') as string;
-  const previousHistoryStr = formData.get('previousHistory') as string;
-
-  if (!audioFile) throw new Error('No audio file provided');
-  
-  // Step 1a: Transcribe Audio using ElevenLabs
-  let transcribedText = "";
   try {
-    const audioBlob = new Blob([await audioFile.arrayBuffer()], { type: audioFile.type || "audio/webm" });
-    const transcription = await elevenlabs.speechToText.convert({
-      file: audioBlob,
-      modelId: "scribe_v2", // using scribe_v2 as per instructions
-      tagAudioEvents: true,
-      // Omit languageCode to let the model auto-detect
-      diarize: true, 
-    });
+    if (!genAI) return JSON.stringify({ success: false, error: "GEMINI_API_KEY is not set." });
+    if (!elevenlabs) return JSON.stringify({ success: false, error: "ELEVENLABS_API_KEY is not set." });
+
+    const audioFile = formData.get('audio') as File;
+    const chiefComplaints = formData.get('chiefComplaints') as string;
+    const patientDataStr = formData.get('patientData') as string;
+    const previousHistoryStr = formData.get('previousHistory') as string;
+
+    if (!audioFile) return JSON.stringify({ success: false, error: "No audio file provided" });
     
-    // ElevenLabs SDK returns an object with a text property
-    transcribedText = transcription.text;
-  } catch (error: any) {
-    console.error('ElevenLabs Transcription Error:', error);
-    const errorCode = error.status || error.code || error.statusCode || 'UNKNOWN';
-    throw new Error(`[ElevenLabs Error ${errorCode}]: ${error.message}`);
-  }
-
-  // Step 1b: Use Gemini to Extract Medical Information
-  const patientData = JSON.parse(patientDataStr);
-  const previousHistory = previousHistoryStr ? JSON.parse(previousHistoryStr) : [];
-
-  let historyContext = "";
-  if (previousHistory && previousHistory.length > 0) {
-    historyContext = "\n--- PREVIOUS CONSULTATION HISTORY ---\n";
-    previousHistory.forEach((record: any) => {
-      const date = new Date(record.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-      historyContext += `Date: ${date}\n`;
-      historyContext += `Symptoms: ${record.prescriptionData?.symptoms?.join(', ') || 'N/A'}\n`;
-      historyContext += `Diagnosis: ${record.prescriptionData?.diagnosis?.join(', ') || 'N/A'}\n`;
-      historyContext += `Medicines: ${record.prescriptionData?.medicines?.map((m:any) => `${m.name} (${m.dosage})`).join(', ') || 'N/A'}\n\n`;
-    });
-    historyContext += "Use this previous history, including the previous dates and prescribed medicines, to inform your current diagnosis, adjust medications (e.g., continuing or changing based on progress), and mention the relevant history in the transcript summary if needed.\n---------------------------------------\n";
-  }
-
-  const prompt = `
-    You are an expert medical scribe.
-    Patient: ${patientData.name}, Age: ${patientData.age}, Gender: ${patientData.gender}.
-    Doctor's Notes: ${chiefComplaints}
-    ${historyContext}
-    
-    --- TRANSCRIBED CONVERSATION ---
-    ${transcribedText}
-    --------------------------------
-
-    Task:
-    1. Read the provided transcribed conversation between the doctor and patient.
-    2. Extract ALL symptoms, diagnosis, and a list of ALL medicines mentioned (generic or brand). Use the previous history to infer context if the doctor refers to "the same medicine as last time" or "from the last visit on [Date]".
-    3. Extract advice and recommended tests. For tests, ALWAYS use the standard, formal medical terminology (the "bookish" name, e.g., "Complete Blood Count (CBC)", "Ultrasonography of Whole Abdomen").
-    4. Provide a brief transcript_summary based on the provided text.
-    
-    Output a JSON object:
-    {
-      "symptoms": ["string"],
-      "diagnosis": ["string"],
-      "medicines_raw": ["string (name)"],
-      "advice": ["string"],
-      "transcript_summary": "string"
+    // Step 1a: Transcribe Audio using ElevenLabs
+    let transcribedText = "";
+    try {
+      const audioBlob = new Blob([await audioFile.arrayBuffer()], { type: audioFile.type || "audio/webm" });
+      const transcription = await elevenlabs.speechToText.convert({
+        file: audioBlob,
+        modelId: "scribe_v2", // using scribe_v2 as per instructions
+        tagAudioEvents: true,
+        // Omit languageCode to let the model auto-detect
+        diarize: true, 
+      });
+      
+      // ElevenLabs SDK returns an object with a text property
+      transcribedText = transcription.text;
+    } catch (error: any) {
+      console.error('ElevenLabs Transcription Error:', error);
+      const errorCode = error.status || error.code || error.statusCode || 'UNKNOWN';
+      return JSON.stringify({ success: false, error: `[ElevenLabs Error ${errorCode}]: ${error.message}` });
     }
-    RETURN ONLY JSON.
-  `;
 
-  const generate = async (model: string) => {
-    return await genAI.models.generateContent({
-      model: model,
-      contents: [{ parts: [{ text: prompt }] }],
-      config: { responseMimeType: "application/json" }
-    });
-  };
+    // Step 1b: Use Gemini to Extract Medical Information
+    const patientData = JSON.parse(patientDataStr);
+    const previousHistory = previousHistoryStr ? JSON.parse(previousHistoryStr) : [];
 
-  try {
+    let historyContext = "";
+    if (previousHistory && previousHistory.length > 0) {
+      historyContext = "\n--- PREVIOUS CONSULTATION HISTORY ---\n";
+      previousHistory.forEach((record: any) => {
+        const date = new Date(record.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        historyContext += `Date: ${date}\n`;
+        historyContext += `Symptoms: ${record.prescriptionData?.symptoms?.join(', ') || 'N/A'}\n`;
+        historyContext += `Diagnosis: ${record.prescriptionData?.diagnosis?.join(', ') || 'N/A'}\n`;
+        historyContext += `Medicines: ${record.prescriptionData?.medicines?.map((m:any) => `${m.name} (${m.dosage})`).join(', ') || 'N/A'}\n\n`;
+      });
+      historyContext += "Use this previous history, including the previous dates and prescribed medicines, to inform your current diagnosis, adjust medications (e.g., continuing or changing based on progress), and mention the relevant history in the transcript summary if needed.\n---------------------------------------\n";
+    }
+
+    const prompt = `
+      You are an expert medical scribe.
+      Patient: ${patientData.name}, Age: ${patientData.age}, Gender: ${patientData.gender}.
+      Doctor's Notes: ${chiefComplaints}
+      ${historyContext}
+      
+      --- TRANSCRIBED CONVERSATION ---
+      ${transcribedText}
+      --------------------------------
+
+      Task:
+      1. Read the provided transcribed conversation between the doctor and patient.
+      2. Extract ALL symptoms, diagnosis, and a list of ALL medicines mentioned (generic or brand). Use the previous history to infer context if the doctor refers to "the same medicine as last time" or "from the last visit on [Date]".
+      3. Extract advice and recommended tests. For tests, ALWAYS use the standard, formal medical terminology (the "bookish" name, e.g., "Complete Blood Count (CBC)", "Ultrasonography of Whole Abdomen").
+      4. Provide a brief transcript_summary based on the provided text.
+      
+      Output a JSON object:
+      {
+        "symptoms": ["string"],
+        "diagnosis": ["string"],
+        "medicines_raw": ["string (name)"],
+        "advice": ["string"],
+        "transcript_summary": "string"
+      }
+      RETURN ONLY JSON.
+    `;
+
+    const generate = async (model: string) => {
+      return await genAI.models.generateContent({
+        model: model,
+        contents: [{ parts: [{ text: prompt }] }],
+        config: { responseMimeType: "application/json" }
+      });
+    };
+
     let response;
     try {
       response = await generate("gemini-3-pro-preview");
@@ -174,98 +174,98 @@ export async function transcribeAudioAction(formData: FormData) {
     }
 
     const text = response.text;
-    if (!text) throw new Error("No response from AI");
+    if (!text) return JSON.stringify({ success: false, error: "No response from AI" });
     
     const parsedData = JSON.parse(text);
     // Attach the raw transcribed text so the frontend can optionally display/use it if needed
     parsedData.raw_transcription = transcribedText;
     
-    return JSON.stringify(parsedData);
+    return JSON.stringify({ success: true, data: parsedData });
   } catch (error: any) {
     console.error('Extraction Error:', error);
     const errorCode = error.status || error.code || error.statusCode || 'UNKNOWN';
-    throw new Error(`[Gemini Extraction Error ${errorCode}]: ${error.message}`);
+    return JSON.stringify({ success: false, error: `[Gemini Extraction Error ${errorCode}]: ${error.message}` });
   }
 }
 
 // Step 2: Verify and Finalize (With Google Search)
 export async function verifyPrescriptionAction(initialDataStr: string, preferencesStr: string, patientDataStr: string, previousHistoryStr: string = "[]") {
-  if (!genAI) throw new Error("GEMINI_API_KEY is not set.");
-
-  const initialData = JSON.parse(initialDataStr);
-  const preferences = JSON.parse(preferencesStr);
-  const patientData = JSON.parse(patientDataStr);
-  const previousHistory = JSON.parse(previousHistoryStr);
-
-  let historyContext = "";
-  if (previousHistory && previousHistory.length > 0) {
-    historyContext = "\n--- PREVIOUS CONSULTATION HISTORY ---\n";
-    previousHistory.forEach((record: any) => {
-      const date = new Date(record.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-      historyContext += `Date: ${date}\n`;
-      historyContext += `Medicines Prescribed: ${record.prescriptionData?.medicines?.map((m:any) => `${m.name} (${m.dosage})`).join(', ') || 'N/A'}\n\n`;
-    });
-    historyContext += "CRITICAL: You MUST use the previously prescribed medicines from these dates when the doctor refers to continuing 'old' medicines or 'the same medicine'. Ensure the context and dates are appropriately considered when suggesting the final prescription.\n---------------------------------------\n";
-  }
-
-  const prompt = `
-    You are an expert medical assistant for a doctor in Bangladesh.
-    
-    Context:
-    - Patient: ${patientData.name}, ${patientData.age}
-    - Initial Findings: ${JSON.stringify(initialData)}
-    - Preferred Pharma Companies: [${preferences?.pharmaCompanies?.join(', ') || 'None'}]
-    - Preferred Diagnostic Centres: [${preferences?.diagnosticCentres?.join(', ') || 'None'}]
-    - Preferred Pharmacies: [${preferences?.pharmacies?.join(', ') || 'None'}]
-    ${historyContext}
-
-    CRITICAL TASK (VERIFICATION):
-    1. For every medicine in "medicines_raw", VERIFY it using Google Search on \`medex.com.bd\`.
-    2. Search query pattern: "site:medex.com.bd [Medicine Name] [Preferred Company]".
-    3. If the mentioned medicine is NOT from a preferred company, FIND an equivalent brand from a preferred company using the search.
-    4. If no preferred alternative exists, keep the original but verify its dosage forms available in BD.
-    5. Suggest ALL possible relevant medicines based on diagnosis if they were implied but not explicitly named, ensuring they are from preferred companies.
-    6. **STRICT RULE (TESTS):** For any tests or investigations, ALWAYS use the formal, standard medical terminology (the "bookish" name, e.g., "Ultrasonography of Whole Abdomen", "Serum Creatinine").
-    7. **STRICT RULE (MEDICINES):** NEVER use vague names like "Painkiller", "Antibiotic", "Gastric medicine". ALWAYS use the specific Brand Name found on Medex (e.g., "Napa", "Seclo", "Azithrocin"). If a generic is transcribed, you MUST convert it to a verified Brand Name.
-
-    Output a FINAL JSON object matching this structure:
-    {
-      "patientName": "${patientData.name}",
-      "patientPhone": "${patientData.phone || ''}",
-      "patientAge": "${patientData.age}",
-      "patientGender": "${patientData.gender}",
-      "patientWeight": "${patientData.weight || ''}",
-      "patientHeight": "${patientData.height || ''}",
-      "patientBp": "${patientData.bp || ''}",
-      "chronicDiseases": ${JSON.stringify(patientData.chronicDiseases || [])},
-      "symptoms": ["string"],
-      "diagnosis": ["string"],
-      "medicines": [
-        {
-          "name": "string (Verified Brand Name from Medex)",
-          "dosage": "string (e.g. 500mg)",
-          "frequency": "string (e.g. 1+0+1)",
-          "duration": "string (e.g. 5 days)",
-          "instruction": "string (e.g. After meal)"
-        }
-      ],
-      "advice": ["string"],
-      "recommendedDiagnosticCentre": "string (suggest from preferences)",
-      "recommendedPharmacy": "string (suggest from preferences)"
-    }
-  `;
-
-  const generate = async (model: string) => {
-    return await genAI.models.generateContent({
-      model: model,
-      contents: [{ parts: [{ text: prompt }] }],
-      config: {
-        tools: [{ googleSearch: {} }]
-      }
-    });
-  };
-
   try {
+    if (!genAI) return JSON.stringify({ success: false, error: "GEMINI_API_KEY is not set." });
+
+    const initialData = JSON.parse(initialDataStr);
+    const preferences = JSON.parse(preferencesStr);
+    const patientData = JSON.parse(patientDataStr);
+    const previousHistory = JSON.parse(previousHistoryStr);
+
+    let historyContext = "";
+    if (previousHistory && previousHistory.length > 0) {
+      historyContext = "\n--- PREVIOUS CONSULTATION HISTORY ---\n";
+      previousHistory.forEach((record: any) => {
+        const date = new Date(record.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        historyContext += `Date: ${date}\n`;
+        historyContext += `Medicines Prescribed: ${record.prescriptionData?.medicines?.map((m:any) => `${m.name} (${m.dosage})`).join(', ') || 'N/A'}\n\n`;
+      });
+      historyContext += "CRITICAL: You MUST use the previously prescribed medicines from these dates when the doctor refers to continuing 'old' medicines or 'the same medicine'. Ensure the context and dates are appropriately considered when suggesting the final prescription.\n---------------------------------------\n";
+    }
+
+    const prompt = `
+      You are an expert medical assistant for a doctor in Bangladesh.
+      
+      Context:
+      - Patient: ${patientData.name}, ${patientData.age}
+      - Initial Findings: ${JSON.stringify(initialData)}
+      - Preferred Pharma Companies: [${preferences?.pharmaCompanies?.join(', ') || 'None'}]
+      - Preferred Diagnostic Centres: [${preferences?.diagnosticCentres?.join(', ') || 'None'}]
+      - Preferred Pharmacies: [${preferences?.pharmacies?.join(', ') || 'None'}]
+      ${historyContext}
+
+      CRITICAL TASK (VERIFICATION):
+      1. For every medicine in "medicines_raw", VERIFY it using Google Search on \`medex.com.bd\`.
+      2. Search query pattern: "site:medex.com.bd [Medicine Name] [Preferred Company]".
+      3. If the mentioned medicine is NOT from a preferred company, FIND an equivalent brand from a preferred company using the search.
+      4. If no preferred alternative exists, keep the original but verify its dosage forms available in BD.
+      5. Suggest ALL possible relevant medicines based on diagnosis if they were implied but not explicitly named, ensuring they are from preferred companies.
+      6. **STRICT RULE (TESTS):** For any tests or investigations, ALWAYS use the formal, standard medical terminology (the "bookish" name, e.g., "Ultrasonography of Whole Abdomen", "Serum Creatinine").
+      7. **STRICT RULE (MEDICINES):** NEVER use vague names like "Painkiller", "Antibiotic", "Gastric medicine". ALWAYS use the specific Brand Name found on Medex (e.g., "Napa", "Seclo", "Azithrocin"). If a generic is transcribed, you MUST convert it to a verified Brand Name.
+
+      Output a FINAL JSON object matching this structure:
+      {
+        "patientName": "${patientData.name}",
+        "patientPhone": "${patientData.phone || ''}",
+        "patientAge": "${patientData.age}",
+        "patientGender": "${patientData.gender}",
+        "patientWeight": "${patientData.weight || ''}",
+        "patientHeight": "${patientData.height || ''}",
+        "patientBp": "${patientData.bp || ''}",
+        "chronicDiseases": ${JSON.stringify(patientData.chronicDiseases || [])},
+        "symptoms": ["string"],
+        "diagnosis": ["string"],
+        "medicines": [
+          {
+            "name": "string (Verified Brand Name from Medex)",
+            "dosage": "string (e.g. 500mg)",
+            "frequency": "string (e.g. 1+0+1)",
+            "duration": "string (e.g. 5 days)",
+            "instruction": "string (e.g. After meal)"
+          }
+        ],
+        "advice": ["string"],
+        "recommendedDiagnosticCentre": "string (suggest from preferences)",
+        "recommendedPharmacy": "string (suggest from preferences)"
+      }
+    `;
+
+    const generate = async (model: string) => {
+      return await genAI.models.generateContent({
+        model: model,
+        contents: [{ parts: [{ text: prompt }] }],
+        config: {
+          tools: [{ googleSearch: {} }]
+        }
+      });
+    };
+
     let response;
     try {
       response = await generate("gemini-3-pro-preview");
@@ -276,7 +276,7 @@ export async function verifyPrescriptionAction(initialDataStr: string, preferenc
     }
 
     const text = response.text;
-    if (!text) throw new Error("No response from AI during verification");
+    if (!text) return JSON.stringify({ success: false, error: "No response from AI during verification" });
 
     // Sanitize JSON
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -290,14 +290,17 @@ export async function verifyPrescriptionAction(initialDataStr: string, preferenc
     }));
 
     return JSON.stringify({
-      ...data,
-      medicines: medicinesWithIds
+      success: true,
+      data: {
+        ...data,
+        medicines: medicinesWithIds
+      }
     });
 
   } catch (error: any) {
     console.error('Verification Error:', error);
     const errorCode = error.status || error.code || error.statusCode || 'UNKNOWN';
-    throw new Error(`[Gemini Verification Error ${errorCode}]: ${error.message}`);
+    return JSON.stringify({ success: false, error: `[Gemini Verification Error ${errorCode}]: ${error.message}` });
   }
 }
 
