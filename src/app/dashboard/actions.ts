@@ -107,7 +107,8 @@ export async function transcribeAudioAction(formData: FormData) {
     transcribedText = transcription.text;
   } catch (error: any) {
     console.error('ElevenLabs Transcription Error:', error);
-    throw new Error(`Speech-to-Text failed: ${error.message}`);
+    const errorCode = error.status || error.code || error.statusCode || 'UNKNOWN';
+    throw new Error(`[ElevenLabs Error ${errorCode}]: ${error.message}`);
   }
 
   // Step 1b: Use Gemini to Extract Medical Information
@@ -182,7 +183,8 @@ export async function transcribeAudioAction(formData: FormData) {
     return parsedData;
   } catch (error: any) {
     console.error('Extraction Error:', error);
-    throw new Error(`Data extraction failed: ${error.message}`);
+    const errorCode = error.status || error.code || error.statusCode || 'UNKNOWN';
+    throw new Error(`[Gemini Extraction Error ${errorCode}]: ${error.message}`);
   }
 }
 
@@ -289,7 +291,8 @@ export async function verifyPrescriptionAction(initialData: any, preferences: an
 
   } catch (error: any) {
     console.error('Verification Error:', error);
-    throw new Error(`Verification failed: ${error.message}`);
+    const errorCode = error.status || error.code || error.statusCode || 'UNKNOWN';
+    throw new Error(`[Gemini Verification Error ${errorCode}]: ${error.message}`);
   }
 }
 

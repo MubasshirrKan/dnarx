@@ -20,6 +20,7 @@ export function ActiveConsultation({ onPrescriptionGenerated, preferences, patie
   const [chiefComplaints, setChiefComplaints] = useState('');
   const [isFinishing, setIsFinishing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
+  const [processError, setProcessError] = useState<string | null>(null);
 
   // Selection states
   const [selectedDiagnosticCentres, setSelectedDiagnosticCentres] = useState<string[]>([]);
@@ -47,6 +48,7 @@ export function ActiveConsultation({ onPrescriptionGenerated, preferences, patie
   useEffect(() => {
     const processAudio = async () => {
       if (isFinishing && audioBlob) {
+        setProcessError(null);
         try {
           // Step 1: Transcribe
           setProcessingStatus("Uploading and Transcribing Audio...");
@@ -74,9 +76,9 @@ export function ActiveConsultation({ onPrescriptionGenerated, preferences, patie
           onPrescriptionGenerated(finalData as PrescriptionData);
 
         } catch (e: any) {
-          console.error(e);
+          console.error("Audio Processing Error:", e);
           setProcessingStatus(null);
-          alert(`Failed to process: ${e.message || 'Unknown error'}`);
+          setProcessError(`ERROR: ${e.message || 'Unknown processing error'}`);
         } finally {
           setIsFinishing(false);
         }
@@ -93,6 +95,7 @@ export function ActiveConsultation({ onPrescriptionGenerated, preferences, patie
     // Set finishing flag to trigger the useEffect once audioBlob is updated
     setIsFinishing(true);
     setProcessingStatus("Finalizing recording...");
+    setProcessError(null);
   };
 
   const formatTime = (seconds: number) => {
@@ -120,6 +123,29 @@ export function ActiveConsultation({ onPrescriptionGenerated, preferences, patie
               <p className="text-sm font-medium text-emerald-50">{processingStatus}</p>
               <p className="text-xs text-slate-400">AI Medical Assistant is working...</p>
             </div>
+          </motion.div>
+        )}
+
+        {processError && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-rose-600/95 backdrop-blur-md text-white px-6 py-4 rounded-xl shadow-2xl flex items-start gap-4 border border-rose-500 min-w-[320px] max-w-[600px]"
+          >
+            <div className="relative pt-0.5">
+               <AlertCircle className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1 pr-4">
+              <p className="text-sm font-bold text-white mb-1">Processing Failed</p>
+              <p className="text-xs text-rose-100 font-mono break-all">{processError}</p>
+            </div>
+            <button 
+              onClick={() => setProcessError(null)}
+              className="text-rose-200 hover:text-white transition-colors"
+            >
+              ✕
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
