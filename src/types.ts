@@ -9,7 +9,7 @@ export interface Medicine {
 
 export interface PatientData {
   name: string;
-  phone?: string;
+  phone: string;
   age: string;
   gender: string;
   weight?: string;

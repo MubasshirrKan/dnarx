@@ -81,10 +81,25 @@ export async function transcribeAudioAction(formData: FormData) {
   const audioFile = formData.get('audio') as File;
   const chiefComplaints = formData.get('chiefComplaints') as string;
   const patientDataStr = formData.get('patientData') as string;
+  const previousHistoryStr = formData.get('previousHistory') as string;
 
   if (!audioFile) throw new Error('No audio file provided');
   
   const patientData = JSON.parse(patientDataStr);
+  const previousHistory = previousHistoryStr ? JSON.parse(previousHistoryStr) : [];
+
+  let historyContext = "";
+  if (previousHistory && previousHistory.length > 0) {
+    historyContext = "\n--- PREVIOUS CONSULTATION HISTORY ---\n";
+    previousHistory.forEach((record: any) => {
+      const date = new Date(record.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      historyContext += `Date: ${date}\n`;
+      historyContext += `Symptoms: ${record.prescriptionData?.symptoms?.join(', ') || 'N/A'}\n`;
+      historyContext += `Diagnosis: ${record.prescriptionData?.diagnosis?.join(', ') || 'N/A'}\n`;
+      historyContext += `Medicines: ${record.prescriptionData?.medicines?.map((m:any) => `${m.name} (${m.dosage})`).join(', ') || 'N/A'}\n\n`;
+    });
+    historyContext += "Use this previous history, including the previous dates and prescribed medicines, to inform your current diagnosis, adjust medications (e.g., continuing or changing based on progress), and mention the relevant history in the transcript summary if needed.\n---------------------------------------\n";
+  }
 
   const arrayBuffer = await audioFile.arrayBuffer();
   const base64Data = Buffer.from(arrayBuffer).toString('base64');
@@ -93,10 +108,11 @@ export async function transcribeAudioAction(formData: FormData) {
     You are an expert medical scribe.
     Patient: ${patientData.name}, Age: ${patientData.age}, Gender: ${patientData.gender}.
     Doctor's Notes: ${chiefComplaints}
+    ${historyContext}
 
     Task:
     1. Transcribe the audio conversation between doctor and patient accurately.
-    2. Extract ALL symptoms, diagnosis, and a list of ALL medicines mentioned (generic or brand).
+    2. Extract ALL symptoms, diagnosis, and a list of ALL medicines mentioned (generic or brand). Use the previous history to infer context if the doctor refers to "the same medicine as last time" or "from the last visit on [Date]".
     3. Extract advice and recommended tests. For tests, ALWAYS use the standard, formal medical terminology (the "bookish" name, e.g., "Complete Blood Count (CBC)", "Ultrasonography of Whole Abdomen").
     
     Output a JSON object:
@@ -146,8 +162,19 @@ export async function transcribeAudioAction(formData: FormData) {
 }
 
 // Step 2: Verify and Finalize (With Google Search)
-export async function verifyPrescriptionAction(initialData: any, preferences: any, patientData: any) {
+export async function verifyPrescriptionAction(initialData: any, preferences: any, patientData: any, previousHistory: any[] = []) {
   if (!genAI) throw new Error("GEMINI_API_KEY is not set.");
+
+  let historyContext = "";
+  if (previousHistory && previousHistory.length > 0) {
+    historyContext = "\n--- PREVIOUS CONSULTATION HISTORY ---\n";
+    previousHistory.forEach((record: any) => {
+      const date = new Date(record.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      historyContext += `Date: ${date}\n`;
+      historyContext += `Medicines Prescribed: ${record.prescriptionData?.medicines?.map((m:any) => `${m.name} (${m.dosage})`).join(', ') || 'N/A'}\n\n`;
+    });
+    historyContext += "CRITICAL: You MUST use the previously prescribed medicines from these dates when the doctor refers to continuing 'old' medicines or 'the same medicine'. Ensure the context and dates are appropriately considered when suggesting the final prescription.\n---------------------------------------\n";
+  }
 
   const prompt = `
     You are an expert medical assistant for a doctor in Bangladesh.
@@ -158,6 +185,7 @@ export async function verifyPrescriptionAction(initialData: any, preferences: an
     - Preferred Pharma Companies: [${preferences?.pharmaCompanies?.join(', ') || 'None'}]
     - Preferred Diagnostic Centres: [${preferences?.diagnosticCentres?.join(', ') || 'None'}]
     - Preferred Pharmacies: [${preferences?.pharmacies?.join(', ') || 'None'}]
+    ${historyContext}
 
     CRITICAL TASK (VERIFICATION):
     1. For every medicine in "medicines_raw", VERIFY it using Google Search on \`medex.com.bd\`.
@@ -177,6 +205,7 @@ export async function verifyPrescriptionAction(initialData: any, preferences: an
       "patientWeight": "${patientData.weight || ''}",
       "patientHeight": "${patientData.height || ''}",
       "patientBp": "${patientData.bp || ''}",
+      "chronicDiseases": ${JSON.stringify(patientData.chronicDiseases || [])},
       "symptoms": ["string"],
       "diagnosis": ["string"],
       "medicines": [
@@ -314,6 +343,7 @@ export async function savePrescription(data: any) {
         weight: data.patientWeight,
         height: data.patientHeight,
         bp: data.patientBp,
+        chronicDiseases: data.chronicDiseases || [],
       },
       prescriptionData: data,
     },

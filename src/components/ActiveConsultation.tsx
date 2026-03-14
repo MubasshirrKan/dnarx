@@ -12,9 +12,10 @@ interface ActiveConsultationProps {
   onPrescriptionGenerated: (data: PrescriptionData) => void;
   preferences: DoctorPreferences;
   patientData: PatientData;
+  patientHistory?: any[];
 }
 
-export function ActiveConsultation({ onPrescriptionGenerated, preferences, patientData }: ActiveConsultationProps) {
+export function ActiveConsultation({ onPrescriptionGenerated, preferences, patientData, patientHistory = [] }: ActiveConsultationProps) {
   const { isRecording, recordingTime, audioBlob, error, startRecording, stopRecording } = useAudioRecorder();
   const [chiefComplaints, setChiefComplaints] = useState('');
   const [isFinishing, setIsFinishing] = useState(false);
@@ -54,6 +55,7 @@ export function ActiveConsultation({ onPrescriptionGenerated, preferences, patie
           formData.append('audio', audioBlob);
           formData.append('patientData', JSON.stringify(patientData));
           formData.append('chiefComplaints', chiefComplaints);
+          formData.append('previousHistory', JSON.stringify(patientHistory));
 
           const initialData = await transcribeAudioAction(formData);
 
@@ -66,7 +68,7 @@ export function ActiveConsultation({ onPrescriptionGenerated, preferences, patie
             pharmacies: selectedPharmacies
           };
 
-          const finalData = await verifyPrescriptionAction(initialData, selectedPreferences, patientData);
+          const finalData = await verifyPrescriptionAction(initialData, selectedPreferences, patientData, patientHistory);
 
           setProcessingStatus("Finalizing Prescription...");
           onPrescriptionGenerated(finalData as PrescriptionData);
